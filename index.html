@@ -36,7 +36,7 @@ body{background:radial-gradient(900px 500px at 85% -10%,#10b98118,transparent),#
 <div id="mod"></div><div id="toast" class="fixed top-4 inset-x-0 flex justify-center z-[60] pointer-events-none"></div>
 <script>
 /* === CONFIGURACIÓN DE LA NUBE (Supabase): pega aquí tus dos datos === */
-const SUPABASE_URL='https://wwzkhfqfqucfeknvvkzz.supabase.co/rest/v1/',SUPABASE_KEY='sb_publishable_5X1CZs8xPno6posImwHRWQ_6felfdEy';
+const SUPABASE_URL='https://wwzkhfqfqucfeknvvkzz.supabase.co',SUPABASE_KEY='sb_publishable_5X1CZs8xPno6posImwHRWQ_6felfdEy';
 const LOW=5,COLS=['products','sales','tx','customers','suppliers','purchases'];let sb,subscribed=false;
 let db={products:[],sales:[],tx:[],customers:[],suppliers:[],purchases:[]};
 const $=id=>document.getElementById(id);
