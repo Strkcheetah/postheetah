@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a"><title>Cheetah Wheels</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+body{background:#0f172a;color:#f8fafc;font-family:system-ui,-apple-system,sans-serif}
+.card{background:#1e293b;border-radius:1rem;padding:1rem}
+.btn{background:#10b981;color:#04261b;font-weight:700;border-radius:.75rem;padding:.6rem 1rem}
+.btn2{background:#334155;color:#f8fafc;border-radius:.75rem;padding:.6rem 1rem}
+.btnr{background:#ef4444;color:#fff;font-weight:700;border-radius:.75rem;padding:.6rem 1rem}
+.inp{width:100%;background:#0f172a;border:1px solid #334155;border-radius:.6rem;padding:.6rem;color:#f8fafc}
+.inp:focus{outline:2px solid #10b981}.mut{color:#94a3b8}
+</style></head>
+<body>
+<div id="login" style="display:none" class="min-h-screen items-center justify-center p-6">
+ <form onsubmit="login(event)" class="card w-full max-w-sm space-y-3">
+  <div class="text-center"><div class="text-5xl">🐆</div><h1 class="text-2xl font-extrabold text-emerald-400">Cheetah Wheels</h1><p class="mut text-sm">Gestión comercial</p></div>
+  <input id="lu" class="inp" placeholder="Usuario" autocomplete="username">
+  <input id="lp" type="password" class="inp" placeholder="Contraseña" autocomplete="current-password">
+  <p id="lerr" class="hidden text-red-400 text-sm">Usuario o contraseña incorrectos.</p>
+  <button class="btn w-full">Iniciar sesión</button>
+ </form>
+</div>
+<div id="app" style="display:none">
+ <aside class="hidden md:flex fixed inset-y-0 left-0 w-56 bg-[#1e293b] flex-col p-4 gap-1" id="side"></aside>
+ <main id="main" class="md:ml-56 p-4 pb-28 max-w-4xl mx-auto"></main>
+ <nav id="bot" class="md:hidden fixed bottom-0 inset-x-0 bg-[#1e293b] border-t border-slate-700 flex justify-around pt-2" style="padding-bottom:max(.5rem,env(safe-area-inset-bottom))"></nav>
+</div>
+<div id="mod"></div><div id="toast" class="fixed top-4 inset-x-0 flex justify-center z-[60] pointer-events-none"></div>
+<script>
+const K='cw_db',S='cw_session',LOW=5;
+let db=JSON.parse(localStorage.getItem(K)||'null')||{products:[],sales:[],tx:[],customers:[],suppliers:[],purchases:[]};
+const save=()=>localStorage.setItem(K,JSON.stringify(db));
+const $=id=>document.getElementById(id);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const m=n=>'$'+(+n||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
+const ld=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sum=a=>a.reduce((s,x)=>s+(+x.balance||0),0);
+const head=(t,a='')=>`<div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">${t}</h2>${a}</div>`;
+const empty=()=>'<p class="mut text-center py-8">Aún no hay registros.</p>';
+const METHODS=['Efectivo','Transferencia','Pago Móvil','Tarjeta','Otro'];
+const opts=a=>a.map(x=>`<option>${x}</option>`).join('');
+let view='home',cart=[],q='',scanner=null,pay='Efectivo',cust='',P=null;
+const NAV=[['home','🏠','Inicio'],['inv','📦','Inventario'],['pos','🛒','Vender'],['cus','👥','Clientes'],['sup','🚚','Proveedores'],['cash','💵','Caja']];
+
+function toast(t){$('toast').innerHTML=`<div class="bg-emerald-500 text-[#04261b] font-semibold px-4 py-2 rounded-xl shadow-lg">${esc(t)}</div>`;setTimeout(()=>$('toast').innerHTML='',2500)}
+function modal(h){$('mod').innerHTML=`<div class="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center" onclick="if(event.target===this)closeM()"><div class="card w-full md:max-w-lg max-h-[92vh] overflow-auto rounded-b-none md:rounded-b-2xl">${h}</div></div>`}
+function closeM(){stopScan();$('mod').innerHTML=''}
+function stopScan(){if(scanner){const s=scanner;scanner=null;s.stop().then(()=>s.clear()).catch(()=>{})}}
+
+function login(e){e.preventDefault();if($('lu').value==='CheetahRuedas'&&$('lp').value==='Ch33tah#W33ls_2026!'){localStorage.setItem(S,'1');boot()}else $('lerr').classList.remove('hidden')}
+function logout(){localStorage.removeItem(S);boot()}
+function boot(){const ok=localStorage.getItem(S)==='1';$('login').style.display=ok?'none':'flex';$('app').style.display=ok?'block':'none';if(ok)render()}
+function go(v){view=v;q='';render();scrollTo(0,0)}
+
+function render(){
+ $('side').innerHTML='<div class="text-xl font-extrabold text-emerald-400 mb-4">🐆 Cheetah Wheels</div>'+NAV.map(([k,i,t])=>`<button onclick="go('${k}')" class="text-left px-3 py-2 rounded-xl ${view===k?'bg-emerald-500 text-[#04261b] font-bold':'mut'}">${i} ${t}</button>`).join('');
+ $('bot').innerHTML=NAV.map(([k,i,t])=>`<button onclick="go('${k}')" class="flex flex-col items-center text-[11px] px-1 ${view===k?'text-emerald-400 font-bold':'mut'}"><span class="text-xl">${i}</span>${t}</button>`).join('');
+ $('main').innerHTML=({home:vHome,inv:vInv,pos:vPos,cus:vCus,sup:vSup,cash:vCash})[view]();
+}
+
+/* ---------- INICIO ---------- */
+function vHome(){
+ const d=ld(),mo=d.slice(0,7),vd=db.sales.filter(s=>s.d===d),vm=db.sales.filter(s=>s.d.slice(0,7)===mo);
+ const g=db.tx.filter(t=>t.type==='out'&&t.d.slice(0,7)===mo).reduce((s,t)=>s+t.amount,0);
+ const low=db.products.filter(p=>p.stock<=LOW);
+ const c=(l,v,col)=>`<div class="card"><div class="mut text-xs">${l}</div><div class="text-xl font-bold ${col}">${v}</div></div>`;
+ return head('Resumen','<span class="mut text-sm">'+d+'</span>')+`<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+ ${c('Ventas hoy',m(vd.reduce((s,x)=>s+x.total,0)),'text-emerald-400')}${c('Ventas del mes',m(vm.reduce((s,x)=>s+x.total,0)),'text-emerald-400')}
+ ${c('Gastos del mes',m(g),'text-red-400')}${c('Por cobrar (me deben)',m(sum(db.customers)),'text-emerald-400')}
+ ${c('Por pagar a proveedores',m(sum(db.suppliers)),'text-red-400')}${c('Productos',db.products.length,'')}</div>
+ <div class="grid grid-cols-2 gap-3 my-4">
+ <button class="btn py-4" onclick="view='pos';render();scanSell()">📷 Nueva venta (escanear)</button>
+ <button class="btnr py-4" onclick="txForm('out')">Nuevo gasto</button>
+ <button class="btn2 py-4" onclick="view='inv';render();prodForm()">+ Agregar producto</button>
+ <button class="btn2 py-4" onclick="view='sup';render();supForm()">+ Registrar proveedor</button></div>
+ <div class="card"><b>⚠️ Stock bajo (${low.length})</b>${low.map(p=>`<div class="flex justify-between py-1 border-b border-slate-700 text-sm"><span>${esc(p.name)}</span><span class="text-red-400">${p.stock} uds</span></div>`).join('')||'<p class="mut text-sm mt-1">Todo en orden.</p>'}</div>`;
+}
+
+/* ---------- INVENTARIO ---------- */
+function vInv(){
+ const l=db.products.filter(p=>(p.name+p.sku+p.cat).toLowerCase().includes(q.toLowerCase()));
+ return head('Inventario','<button class="btn" onclick="prodForm()">+ Producto</button>')+
+ `<div class="flex gap-2 mb-3"><input class="inp" placeholder="Buscar nombre, código o categoría" value="${esc(q)}" onchange="q=this.value;render()"><button class="btn" onclick="scan(c=>{q=c;render()})">📷</button></div>`+
+ (l.map(p=>`<div class="card mb-2"><div class="flex justify-between gap-2"><div><b>${esc(p.name)}</b><div class="mut text-xs">${esc(p.sku)||'Sin código'} · ${esc(p.cat)}</div><div class="text-sm mt-1">Costo ${m(p.cost)} · Venta <b class="text-emerald-400">${m(p.price)}</b></div></div>
+ <span class="h-fit px-2 py-1 rounded-lg text-sm font-bold ${p.stock<=LOW?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}">${p.stock} uds</span></div>
+ <div class="flex gap-2 mt-2 text-sm"><button class="btn2" onclick="prodForm('${p.id}')">Editar</button><button class="btn2 text-red-400" onclick="delP('${p.id}')">Eliminar</button></div></div>`).join('')||empty());
+}
+function prodForm(id,dr){
+ const p=dr||db.products.find(x=>x.id===id)||{};id=id||'';
+ modal(`<h3 class="font-bold text-lg mb-3">${id?'Editar':'Nuevo'} producto</h3><div class="space-y-2">
+ <input id="pn" class="inp" placeholder="Nombre" value="${esc(p.name)}">
+ <div class="flex gap-2"><input id="ps" class="inp" placeholder="Código de barras (SKU)" value="${esc(p.sku)}"><button class="btn" onclick="scanSku('${id}')">📷 Escanear</button></div>
+ <div class="grid grid-cols-2 gap-2"><input id="pc" type="number" step="0.01" class="inp" placeholder="Precio de costo" value="${p.cost??''}"><input id="pp" type="number" step="0.01" class="inp" placeholder="Precio de venta" value="${p.price??''}"></div>
+ <div class="grid grid-cols-2 gap-2"><input id="pk" type="number" class="inp" placeholder="Stock" value="${p.stock??''}"><input id="pt" class="inp" placeholder="Categoría" value="${esc(p.cat)}"></div>
+ <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveP('${id}')">Guardar</button></div></div>`);
+}
+const readP=()=>({name:$('pn').value.trim(),sku:$('ps').value.trim(),cost:+$('pc').value||0,price:+$('pp').value||0,stock:+$('pk').value||0,cat:$('pt').value.trim()||'General'});
+function scanSku(id){const d=readP();scan(c=>{d.sku=c;prodForm(id,d)})}
+function saveP(id){
+ const d=readP();if(!d.name)return toast('Escribe el nombre');
+ if(d.sku&&db.products.some(x=>x.sku===d.sku&&x.id!==id))return toast('Ese código ya existe');
+ if(id)Object.assign(db.products.find(x=>x.id===id),d);else db.products.push({id:uid(),...d});
+ save();closeM();render();toast('Producto guardado');
+}
+function delP(id){if(confirm('¿Eliminar producto?')){db.products=db.products.filter(x=>x.id!==id);save();render()}}
+
+/* ---------- ESCÁNER ---------- */
+function scan(cb){
+ window._cb=cb;
+ modal(`<h3 class="font-bold mb-2">Escanear código</h3><div id="rd" class="rounded-xl overflow-hidden"></div><p id="se" class="text-red-400 text-sm"></p>
+ <p class="mut text-sm my-2">O escríbelo a mano:</p><div class="flex gap-2"><input id="mc" class="inp"><button class="btn" onclick="manual()">OK</button></div>
+ <button class="btn2 w-full mt-3" onclick="closeM()">Cancelar</button>`);
+ try{
+  const F=Html5QrcodeSupportedFormats;
+  scanner=new Html5Qrcode('rd',{formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.QR_CODE]});
+  scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:150}},code=>{const f=window._cb;closeM();f(code)},()=>{})
+   .catch(()=>{$('se').textContent='No se pudo abrir la cámara. Revisa los permisos o usa el campo manual.'});
+ }catch(e){$('se').textContent='Escáner no disponible.'}
+}
+function manual(){const c=$('mc').value.trim();if(!c)return;const f=window._cb;closeM();f(c)}
+
+/* ---------- VENDER ---------- */
+function vPos(){
+ const l=db.products.filter(p=>(p.name+p.sku).toLowerCase().includes(q.toLowerCase())).slice(0,30);
+ const tot=cart.reduce((s,i)=>s+i.qty*i.price,0);
+ return head('Punto de venta')+`<button class="btn w-full py-4 text-lg mb-3" onclick="scanSell()">📷 Escanear producto para vender</button>
+ <input class="inp mb-3" placeholder="Buscar producto..." value="${esc(q)}" onchange="q=this.value;render()">
+ <div class="flex gap-2 overflow-x-auto pb-2 mb-3">${l.map(p=>`<button class="card shrink-0 text-left text-sm" onclick="addCart('${p.id}')"><b>${esc(p.name)}</b><div class="text-emerald-400">${m(p.price)}</div><div class="mut text-xs">${p.stock} uds</div></button>`).join('')||'<span class="mut text-sm">Sin resultados</span>'}</div>
+ <div class="card"><b>Carrito</b>${cart.map(i=>`<div class="flex items-center justify-between py-2 border-b border-slate-700"><div class="text-sm"><b>${esc(i.name)}</b><div class="mut">${m(i.price)}</div></div>
+ <div class="flex items-center gap-2"><button class="btn2 px-3" onclick="chg('${i.id}',-1)">−</button><b>${i.qty}</b><button class="btn2 px-3" onclick="chg('${i.id}',1)">+</button></div></div>`).join('')||'<p class="mut text-sm py-3">Carrito vacío.</p>'}
+ <div class="flex justify-between text-xl font-bold my-3"><span>Total</span><span class="text-emerald-400">${m(tot)}</span></div>
+ <div class="grid grid-cols-2 gap-2"><select class="inp" onchange="pay=this.value">${['Efectivo','Transferencia','Pago Móvil','Tarjeta','Fiado'].map(x=>`<option ${x===pay?'selected':''}>${x}</option>`).join('')}</select>
+ <select class="inp" onchange="cust=this.value"><option value="">Cliente (opcional)</option>${db.customers.map(c=>`<option value="${c.id}" ${c.id===cust?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+ <button class="btn w-full mt-3 py-3" onclick="checkout()">Cobrar ${m(tot)}</button></div>`;
+}
+function addCart(id){
+ const p=db.products.find(x=>x.id===id),i=cart.find(x=>x.id===id),n=(i?i.qty:0)+1;
+ if(n>p.stock)return toast('Stock insuficiente');
+ if(i)i.qty=n;else cart.push({id,name:p.name,qty:1,price:p.price,cost:p.cost});
+ render();toast('Agregado: '+p.name);
+}
+function chg(id,d){const i=cart.find(x=>x.id===id),p=db.products.find(x=>x.id===id);if(i.qty+d>p.stock)return toast('Stock insuficiente');i.qty+=d;if(i.qty<=0)cart=cart.filter(x=>x.id!==id);render()}
+function scanSell(){
+ scan(code=>{
+  const p=db.products.find(x=>x.sku===code);
+  if(!p)return modal(`<h3 class="font-bold">Producto no encontrado</h3><p class="mut my-2">Código: ${esc(code)}</p><div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cerrar</button><button class="btn flex-1" onclick="prodForm('',{sku:'${esc(code)}'})">Crear producto</button></div>`);
+  modal(`<h3 class="font-bold text-lg">${esc(p.name)}</h3><p class="mut text-sm">${esc(p.sku)} · ${esc(p.cat)}</p>
+  <div class="flex justify-between my-3"><span class="text-2xl font-bold text-emerald-400">${m(p.price)}</span><span class="${p.stock<=LOW?'text-red-400':'mut'}">${p.stock} en stock</span></div>
+  <div class="flex gap-2"><button class="btn2 flex-1" onclick="scanSell()">Escanear otro</button><button class="btn flex-1" onclick="addCart('${p.id}');closeM()">Agregar al carrito</button></div>`);
+ });
+}
+function checkout(){
+ if(!cart.length)return toast('El carrito está vacío');
+ if(pay==='Fiado'&&!cust)return toast('Elige un cliente para fiar');
+ const total=cart.reduce((s,i)=>s+i.qty*i.price,0);
+ cart.forEach(i=>{db.products.find(x=>x.id===i.id).stock-=i.qty});
+ db.sales.push({id:uid(),d:ld(),t:Date.now(),items:cart,total,method:pay,cust});
+ if(pay==='Fiado'){const c=db.customers.find(x=>x.id===cust);c.balance+=total;c.hist.push({d:ld(),type:'Crédito (venta)',amount:total})}
+ cart=[];save();render();toast('Venta registrada: '+m(total));
+}
+
+/* ---------- CLIENTES / PROVEEDORES ---------- */
+function vCus(){
+ return head('Clientes','<button class="btn" onclick="cusForm()">+ Cliente</button>')+`<div class="card mb-3 flex justify-between"><span class="mut">Total que me deben</span><b class="text-red-400">${m(sum(db.customers))}</b></div>`+
+ (db.customers.map(c=>`<div class="card mb-2"><div class="flex justify-between"><div><b>${esc(c.name)}</b><div class="mut text-sm">${esc(c.phone)}</div></div><b class="${c.balance>0?'text-red-400':'text-emerald-400'}">${m(c.balance)}</b></div>
+ <div class="flex gap-2 mt-2 text-sm"><button class="btn2" onclick="mvForm('c','${c.id}','cred')">Fiar</button><button class="btn" onclick="mvForm('c','${c.id}','abono')">Abono</button><button class="btn2" onclick="hist('c','${c.id}')">Historial</button></div></div>`).join('')||empty());
+}
+function cusForm(){modal(`<h3 class="font-bold text-lg mb-3">Nuevo cliente</h3><div class="space-y-2"><input id="cn" class="inp" placeholder="Nombre"><input id="cp" class="inp" placeholder="Teléfono">
+ <div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveC()">Guardar</button></div></div>`)}
+function saveC(){const n=$('cn').value.trim();if(!n)return toast('Escribe el nombre');db.customers.push({id:uid(),name:n,phone:$('cp').value.trim(),balance:0,hist:[]});save();closeM();render()}
+function vSup(){
+ return head('Proveedores','<button class="btn" onclick="supForm()">+ Proveedor</button>')+`<div class="card mb-3 flex justify-between"><span class="mut">Total que debo</span><b class="text-red-400">${m(sum(db.suppliers))}</b></div>`+
+ (db.suppliers.map(s=>`<div class="card mb-2"><div class="flex justify-between"><div><b>${esc(s.name)}</b> <span class="mut text-sm">${esc(s.company)}</span><div class="mut text-sm">${esc(s.phone)}</div><div class="text-xs mut">Suministra: ${esc(s.supplies)||'—'}</div></div><b class="${s.balance>0?'text-red-400':'text-emerald-400'}">${m(s.balance)}</b></div>
+ <div class="flex gap-2 mt-2 text-sm flex-wrap"><button class="btn" onclick="purchForm('${s.id}')">Registrar compra</button><button class="btn2" onclick="mvForm('s','${s.id}','abono')">Pagar deuda</button><button class="btn2" onclick="hist('s','${s.id}')">Historial</button></div></div>`).join('')||empty());
+}
+function supForm(){modal(`<h3 class="font-bold text-lg mb-3">Nuevo proveedor</h3><div class="space-y-2"><input id="sn" class="inp" placeholder="Nombre"><input id="sp" class="inp" placeholder="Teléfono"><input id="sc" class="inp" placeholder="Empresa"><input id="ss" class="inp" placeholder="Productos que suministra">
+ <div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveS()">Guardar</button></div></div>`)}
+function saveS(){const n=$('sn').value.trim();if(!n)return toast('Escribe el nombre');db.suppliers.push({id:uid(),name:n,phone:$('sp').value.trim(),company:$('sc').value.trim(),supplies:$('ss').value.trim(),balance:0,hist:[]});save();closeM();render()}
+const ent=(t,id)=>(t==='c'?db.customers:db.suppliers).find(x=>x.id===id);
+function mvForm(t,id,k){
+ const e=ent(t,id),ab=k==='abono';
+ modal(`<h3 class="font-bold text-lg">${ab?(t==='c'?'Abono de ':'Pago a ')+esc(e.name):'Fiar a '+esc(e.name)}</h3><p class="mut text-sm mb-2">Saldo actual: ${m(e.balance)}</p><div class="space-y-2">
+ <input id="ma" type="number" step="0.01" class="inp" placeholder="Monto"><select id="mm" class="inp">${opts(METHODS)}</select><input id="mn" class="inp" placeholder="Nota (opcional)">
+ <div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="doMv('${t}','${id}','${k}')">Confirmar</button></div></div>`);
+}
+function doMv(t,id,k){
+ const e=ent(t,id);let a=+$('ma').value;if(!(a>0))return toast('Monto inválido');
+ const meth=$('mm').value,note=$('mn').value.trim();
+ if(k==='abono'){a=Math.min(a,e.balance);if(a<=0)return toast('No hay deuda pendiente');e.balance-=a;e.hist.push({d:ld(),type:'Abono',amount:a,note});
+  db.tx.push({id:uid(),d:ld(),type:t==='c'?'in':'out',amount:a,cat:t==='c'?'Abono cliente':'Pago proveedor',method:meth,note:e.name})}
+ else{e.balance+=a;e.hist.push({d:ld(),type:'Crédito',amount:a,note})}
+ save();closeM();render();toast('Registrado');
+}
+function hist(t,id){const e=ent(t,id);modal(`<h3 class="font-bold text-lg mb-2">Historial: ${esc(e.name)}</h3>${e.hist.slice().reverse().map(h=>`<div class="flex justify-between py-2 border-b border-slate-700 text-sm"><span>${h.d} · ${esc(h.type)} <span class="mut">${esc(h.note)}</span></span><b>${m(h.amount)}</b></div>`).join('')||empty()}<button class="btn2 w-full mt-3" onclick="closeM()">Cerrar</button>`)}
+
+/* ---------- COMPRAS A PROVEEDOR ---------- */
+function purchForm(sid){
+ if(!db.products.length)return toast('Primero crea productos');
+ P={sid,lines:[],type:'Contado'};drawP();
+}
+function drawP(){
+ const s=ent('s',P.sid),tot=P.lines.reduce((a,l)=>a+l.qty*l.cost,0);
+ modal(`<h3 class="font-bold text-lg mb-2">Compra a ${esc(s.name)}</h3>
+ <div class="grid grid-cols-3 gap-2"><select id="lp2" class="inp col-span-3">${db.products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+ <input id="lq" type="number" class="inp" placeholder="Cantidad"><input id="lc" type="number" step="0.01" class="inp" placeholder="Costo unit."><button class="btn" onclick="addL()">Agregar</button></div>
+ <div class="my-3">${P.lines.map((l,i)=>`<div class="flex justify-between text-sm py-1 border-b border-slate-700"><span>${l.qty} × ${esc(db.products.find(p=>p.id===l.pid).name)} @ ${m(l.cost)}</span><button class="text-red-400" onclick="P.lines.splice(${i},1);drawP()">✕</button></div>`).join('')||'<p class="mut text-sm">Sin líneas.</p>'}</div>
+ <div class="flex justify-between font-bold text-lg"><span>Total</span><span>${m(tot)}</span></div>
+ <select class="inp my-2" onchange="P.type=this.value;drawP()"><option ${P.type==='Contado'?'selected':''}>Contado</option><option ${P.type==='Crédito'?'selected':''}>Crédito</option></select>
+ ${P.type==='Crédito'?'<input id="pd" type="number" step="0.01" class="inp mb-2" placeholder="Abono inicial (opcional)">':''}
+ <div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="confP()">Confirmar compra</button></div>`);
+}
+function addL(){const qty=+$('lq').value,cost=+$('lc').value;if(!(qty>0)||!(cost>=0)||$('lc').value==='')return toast('Cantidad y costo requeridos');P.lines.push({pid:$('lp2').value,qty,cost});drawP()}
+function confP(){
+ if(!P.lines.length)return toast('Agrega productos');
+ const s=ent('s',P.sid),total=P.lines.reduce((a,l)=>a+l.qty*l.cost,0);
+ const paid=P.type==='Contado'?total:Math.min(+($('pd')?.value)||0,total);
+ P.lines.forEach(l=>{const p=db.products.find(x=>x.id===l.pid);p.stock+=l.qty;p.cost=l.cost});
+ s.balance+=total-paid;s.hist.push({d:ld(),type:'Compra '+P.type.toLowerCase(),amount:total,note:'Pagado '+m(paid)});
+ db.purchases.push({id:uid(),d:ld(),sid:P.sid,lines:P.lines,total,paid});
+ if(paid>0)db.tx.push({id:uid(),d:ld(),type:'out',amount:paid,cat:'Compra de mercancía',method:'Efectivo',note:s.name});
+ save();closeM();render();toast('Compra registrada, stock actualizado');
+}
+
+/* ---------- CAJA Y RESPALDO ---------- */
+function vCash(){
+ const d=ld(),t=db.tx.filter(x=>x.d===d),i=t.filter(x=>x.type==='in').reduce((s,x)=>s+x.amount,0),o=t.filter(x=>x.type==='out').reduce((s,x)=>s+x.amount,0);
+ return head('Caja diaria')+`<div class="grid grid-cols-2 gap-3 mb-3"><div class="card"><div class="mut text-xs">Ingresos hoy</div><b class="text-emerald-400 text-lg">${m(i)}</b></div><div class="card"><div class="mut text-xs">Egresos hoy</div><b class="text-red-400 text-lg">${m(o)}</b></div></div>
+ <div class="grid grid-cols-2 gap-3 mb-4"><button class="btn" onclick="txForm('in')">+ Ingreso</button><button class="btnr" onclick="txForm('out')">+ Gasto</button></div>
+ ${db.tx.slice().reverse().slice(0,30).map(x=>`<div class="card mb-2 flex justify-between text-sm"><div><b>${esc(x.cat)}</b><div class="mut">${x.d} · ${esc(x.method)} ${esc(x.note)}</div></div><b class="${x.type==='in'?'text-emerald-400':'text-red-400'}">${x.type==='in'?'+':'−'}${m(x.amount)}</b></div>`).join('')||empty()}
+ <div class="card mt-4 space-y-2"><b>Respaldo de datos</b><div class="grid grid-cols-2 gap-2"><button class="btn" onclick="exportDB()">⬇ Exportar JSON</button><button class="btn2" onclick="$('imp').click()">⬆ Importar JSON</button></div>
+ <input id="imp" type="file" accept="application/json" class="hidden" onchange="importDB(this)"><button class="btnr w-full" onclick="logout()">Cerrar sesión</button></div>`;
+}
+function txForm(type){
+ const cats=type==='in'?['Venta libre','Servicio','Otros ingresos']:['Alquiler','Servicios','Transporte','Nómina','Mercancía','Otros gastos'];
+ modal(`<h3 class="font-bold text-lg mb-3">${type==='in'?'Nuevo ingreso':'Nuevo gasto'}</h3><div class="space-y-2"><input id="ta" type="number" step="0.01" class="inp" placeholder="Monto">
+ <select id="tc" class="inp">${opts(cats)}</select><select id="tm" class="inp">${opts(METHODS)}</select><input id="tn" class="inp" placeholder="Nota (opcional)">
+ <div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveTx('${type}')">Guardar</button></div></div>`);
+}
+function saveTx(type){const a=+$('ta').value;if(!(a>0))return toast('Monto inválido');db.tx.push({id:uid(),d:ld(),type,amount:a,cat:$('tc').value,method:$('tm').value,note:$('tn').value.trim()});save();closeM();render();toast('Guardado')}
+function exportDB(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download='cheetah-wheels-respaldo-'+ld()+'.json';a.click()}
+function importDB(inp){
+ const f=inp.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.products||!d.sales||!d.customers||!d.suppliers)throw 0;
+  if(!confirm('Esto reemplazará todos los datos actuales. ¿Continuar?'))return;
+  db={tx:[],purchases:[],...d};save();render();toast('Respaldo importado')}catch(e){toast('Archivo de respaldo inválido')}};
+ r.readAsText(f);
+}
+boot();
+</script></body></html>
