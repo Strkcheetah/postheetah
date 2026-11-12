@@ -2,21 +2,26 @@
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0f172a"><title>Cheetah Wheels</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
-body{background:#0f172a;color:#f8fafc;font-family:system-ui,-apple-system,sans-serif}
-.card{background:#1e293b;border-radius:1rem;padding:1rem}
-.btn{background:#10b981;color:#04261b;font-weight:700;border-radius:.75rem;padding:.6rem 1rem}
-.btn2{background:#334155;color:#f8fafc;border-radius:.75rem;padding:.6rem 1rem}
-.btnr{background:#ef4444;color:#fff;font-weight:700;border-radius:.75rem;padding:.6rem 1rem}
-.inp{width:100%;background:#0f172a;border:1px solid #334155;border-radius:.6rem;padding:.6rem;color:#f8fafc}
-.inp:focus{outline:2px solid #10b981}.mut{color:#94a3b8}
+body{background:radial-gradient(900px 500px at 85% -10%,#10b98118,transparent),#0f172a;background-attachment:fixed;color:#f1f5f9;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.card{background:linear-gradient(180deg,#1f2c44,#1b2740);border:1px solid #2a3a58;border-radius:1.1rem;padding:1.1rem;box-shadow:0 10px 24px -14px #000c}
+.btn{background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:600;border-radius:.8rem;padding:.65rem 1.1rem;box-shadow:0 6px 16px -8px #10b981;transition:.15s}
+.btn2{background:#223150;border:1px solid #2f4268;color:#e2e8f0;font-weight:500;border-radius:.8rem;padding:.65rem 1.1rem}
+.btnr{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-weight:600;border-radius:.8rem;padding:.65rem 1.1rem}
+.btn:active,.btn2:active,.btnr:active{transform:scale(.97)}
+.inp{width:100%;background:#0f172a;border:1px solid #2f4268;border-radius:.75rem;padding:.7rem .8rem;color:#f8fafc}
+.inp:focus{outline:2px solid #10b981;border-color:transparent}.mut{color:#94a3b8}
+.thumb{object-fit:cover;border-radius:.8rem;background:#0f172a;border:1px solid #2a3a58}
+.ph{display:flex;align-items:center;justify-content:center;color:#475569}
 </style></head>
 <body>
 <div id="login" style="display:none" class="min-h-screen items-center justify-center p-6">
  <form onsubmit="login(event)" class="card w-full max-w-sm space-y-3">
-  <div class="text-center"><div class="text-5xl">🐆</div><h1 class="text-2xl font-extrabold text-emerald-400">Cheetah Wheels</h1><p class="mut text-sm">Gestión comercial</p></div>
+  <div class="text-center py-2"><div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-[#04261b] text-2xl font-extrabold flex items-center justify-center shadow-lg">CW</div><h1 class="text-2xl font-semibold tracking-tight">Cheetah Wheels</h1><p class="mut text-sm">Gestión comercial e inventario</p></div>
   <input id="lu" class="inp" placeholder="Usuario" autocomplete="username">
   <input id="lp" type="password" class="inp" placeholder="Contraseña" autocomplete="current-password">
   <p id="lerr" class="hidden text-red-400 text-sm">Usuario o contraseña incorrectos.</p>
@@ -24,89 +29,124 @@ body{background:#0f172a;color:#f8fafc;font-family:system-ui,-apple-system,sans-s
  </form>
 </div>
 <div id="app" style="display:none">
- <aside class="hidden md:flex fixed inset-y-0 left-0 w-56 bg-[#1e293b] flex-col p-4 gap-1" id="side"></aside>
+ <aside class="hidden md:flex fixed inset-y-0 left-0 w-56 bg-[#0c1424] border-r border-slate-800 flex-col p-4 gap-1" id="side"></aside>
  <main id="main" class="md:ml-56 p-4 pb-28 max-w-4xl mx-auto"></main>
- <nav id="bot" class="md:hidden fixed bottom-0 inset-x-0 bg-[#1e293b] border-t border-slate-700 flex justify-around pt-2" style="padding-bottom:max(.5rem,env(safe-area-inset-bottom))"></nav>
+ <nav id="bot" class="md:hidden fixed bottom-0 inset-x-0 bg-[#0c1424]/95 backdrop-blur border-t border-slate-800 flex justify-around pt-2" style="padding-bottom:max(.5rem,env(safe-area-inset-bottom))"></nav>
 </div>
 <div id="mod"></div><div id="toast" class="fixed top-4 inset-x-0 flex justify-center z-[60] pointer-events-none"></div>
 <script>
-const K='cw_db',S='cw_session',LOW=5;
-let db=JSON.parse(localStorage.getItem(K)||'null')||{products:[],sales:[],tx:[],customers:[],suppliers:[],purchases:[]};
-const save=()=>localStorage.setItem(K,JSON.stringify(db));
+/* === CONFIGURACIÓN DE LA NUBE (Supabase): pega aquí tus dos datos === */
+const SUPABASE_URL='PEGA_AQUI_TU_PROJECT_URL',SUPABASE_KEY='PEGA_AQUI_TU_ANON_KEY';
+const LOW=5,COLS=['products','sales','tx','customers','suppliers','purchases'];let sb,subscribed=false;
+let db={products:[],sales:[],tx:[],customers:[],suppliers:[],purchases:[]};
 const $=id=>document.getElementById(id);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const m=n=>'$'+(+n||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
 const ld=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sum=a=>a.reduce((s,x)=>s+(+x.balance||0),0);
-const head=(t,a='')=>`<div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">${t}</h2>${a}</div>`;
+const head=(t,a='')=>`<div class="flex justify-between items-center mb-5"><h2 class="text-2xl font-semibold tracking-tight">${t}</h2>${a}</div>`;
 const empty=()=>'<p class="mut text-center py-8">Aún no hay registros.</p>';
 const METHODS=['Efectivo','Transferencia','Pago Móvil','Tarjeta','Otro'];
 const opts=a=>a.map(x=>`<option>${x}</option>`).join('');
 let view='home',cart=[],q='',scanner=null,pay='Efectivo',cust='',P=null;
-const NAV=[['home','🏠','Inicio'],['inv','📦','Inventario'],['pos','🛒','Vender'],['cus','👥','Clientes'],['sup','🚚','Proveedores'],['cash','💵','Caja']];
+const IC={home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',box:'<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',cart:'<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h9.1a1 1 0 0 0 1-.8L21 7H6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.5.6 4 2.6 4 6"/>',truck:'<path d="M2 6h11v10H2zM13 9h4l4 4v3h-8"/><circle cx="6.5" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',wallet:'<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1"/>',scan:'<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/>',camera:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',plus:'<path d="M12 5v14M5 12h14"/>',image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-9 9"/>',check:'<path d="M5 12l5 5 9-10"/>'};
+const ic=(n,z=20)=>`<svg width="${z}" height="${z}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[n]}</svg>`;
+const pic=(p,c='w-14 h-14')=>p.img?`<img src="${p.img}" class="thumb ${c}" alt="">`:`<div class="thumb ph ${c}">${ic('image',24)}</div>`;
+const sp=x=>x.profit??x.items.reduce((a,i)=>a+(i.price-i.cost)*i.qty,0);
+const NAV=[['home','home','Inicio'],['inv','box','Inventario'],['pos','cart','Vender'],['cus','users','Clientes'],['sup','truck','Proveedores'],['cash','wallet','Caja']];
 
 function toast(t){$('toast').innerHTML=`<div class="bg-emerald-500 text-[#04261b] font-semibold px-4 py-2 rounded-xl shadow-lg">${esc(t)}</div>`;setTimeout(()=>$('toast').innerHTML='',2500)}
 function modal(h){$('mod').innerHTML=`<div class="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center" onclick="if(event.target===this)closeM()"><div class="card w-full md:max-w-lg max-h-[92vh] overflow-auto rounded-b-none md:rounded-b-2xl">${h}</div></div>`}
 function closeM(){stopScan();$('mod').innerHTML=''}
 function stopScan(){if(scanner){const s=scanner;scanner=null;s.stop().then(()=>s.clear()).catch(()=>{})}}
 
-function login(e){e.preventDefault();if($('lu').value==='CheetahRuedas'&&$('lp').value==='Ch33tah#W33ls_2026!'){localStorage.setItem(S,'1');boot()}else $('lerr').classList.remove('hidden')}
-function logout(){localStorage.removeItem(S);boot()}
-function boot(){const ok=localStorage.getItem(S)==='1';$('login').style.display=ok?'none':'flex';$('app').style.display=ok?'block':'none';if(ok)render()}
+async function login(e){
+ e.preventDefault();$('lerr').classList.add('hidden');
+ const {error}=await sb.auth.signInWithPassword({email:$('lu').value.trim().toLowerCase()+'@cheetahwheels.app',password:$('lp').value});
+ if(error)$('lerr').classList.remove('hidden');else boot();
+}
+async function logout(){await sb.auth.signOut();sb.removeAllChannels();subscribed=false;boot()}
+async function boot(){
+ const {data}=await sb.auth.getSession(),ok=!!data.session;
+ $('login').style.display=ok?'none':'flex';$('app').style.display=ok?'block':'none';if(!ok)return;
+ $('main').innerHTML='<p class="mut text-center p-10">Sincronizando…</p>';
+ await loadAll();
+ if(!db.products.length&&!db.customers.length&&!db.sales.length&&!localStorage.getItem('cw_asked')){
+  const L=await localData();localStorage.setItem('cw_asked','1');
+  if(L&&((L.products||[]).length||(L.customers||[]).length||(L.sales||[]).length)&&confirm('Encontré datos guardados en este dispositivo. ¿Subirlos a la nube?'))await setDB(L);
+ }
+ render();subscribe();
+}
 function go(v){view=v;q='';render();scrollTo(0,0)}
 
 function render(){
- $('side').innerHTML='<div class="text-xl font-extrabold text-emerald-400 mb-4">🐆 Cheetah Wheels</div>'+NAV.map(([k,i,t])=>`<button onclick="go('${k}')" class="text-left px-3 py-2 rounded-xl ${view===k?'bg-emerald-500 text-[#04261b] font-bold':'mut'}">${i} ${t}</button>`).join('');
- $('bot').innerHTML=NAV.map(([k,i,t])=>`<button onclick="go('${k}')" class="flex flex-col items-center text-[11px] px-1 ${view===k?'text-emerald-400 font-bold':'mut'}"><span class="text-xl">${i}</span>${t}</button>`).join('');
- $('main').innerHTML=({home:vHome,inv:vInv,pos:vPos,cus:vCus,sup:vSup,cash:vCash})[view]();
+ $('side').innerHTML=`<div class="flex items-center gap-3 mb-6 px-1"><div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-[#04261b] font-extrabold flex items-center justify-center">CW</div><div><div class="font-semibold leading-tight">Cheetah Wheels</div><div class="mut text-xs">Gestión comercial</div></div></div>`+NAV.map(([k,i,t])=>`<button onclick="go('${k}')" class="flex items-center gap-3 text-left px-3 py-2.5 rounded-xl text-sm transition ${view===k?'bg-emerald-500/15 text-emerald-400 font-semibold':'mut hover:bg-slate-800'}">${ic(i)} ${t}</button>`).join('');
+ $('bot').innerHTML=NAV.map(([k,i,t])=>`<button onclick="go('${k}')" class="flex flex-col items-center gap-0.5 text-[10px] px-1 ${view===k?'text-emerald-400 font-semibold':'mut'}">${ic(i,22)}${t}</button>`).join('');
+ $('main').innerHTML=({home:vHome,inv:vInv,pos:vPos,cus:vCus,sup:vSup,cash:vCash})[view]();if(view==='cash')est();
 }
 
 /* ---------- INICIO ---------- */
 function vHome(){
  const d=ld(),mo=d.slice(0,7),vd=db.sales.filter(s=>s.d===d),vm=db.sales.filter(s=>s.d.slice(0,7)===mo);
+ const T=a=>a.reduce((s,x)=>s+x.total,0),G=a=>a.reduce((s,x)=>s+sp(x),0);
  const g=db.tx.filter(t=>t.type==='out'&&t.d.slice(0,7)===mo).reduce((s,t)=>s+t.amount,0);
+ const inv=db.products.reduce((s,p)=>s+p.cost*p.stock,0),val=db.products.reduce((s,p)=>s+p.price*p.stock,0);
  const low=db.products.filter(p=>p.stock<=LOW);
- const c=(l,v,col)=>`<div class="card"><div class="mut text-xs">${l}</div><div class="text-xl font-bold ${col}">${v}</div></div>`;
- return head('Resumen','<span class="mut text-sm">'+d+'</span>')+`<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
- ${c('Ventas hoy',m(vd.reduce((s,x)=>s+x.total,0)),'text-emerald-400')}${c('Ventas del mes',m(vm.reduce((s,x)=>s+x.total,0)),'text-emerald-400')}
- ${c('Gastos del mes',m(g),'text-red-400')}${c('Por cobrar (me deben)',m(sum(db.customers)),'text-emerald-400')}
- ${c('Por pagar a proveedores',m(sum(db.suppliers)),'text-red-400')}${c('Productos',db.products.length,'')}</div>
+ const c=(l,v,col='')=>`<div class="card"><div class="mut text-xs mb-1">${l}</div><div class="text-xl font-semibold ${col}">${v}</div></div>`;
+ const qb='flex items-center justify-center gap-2 py-3.5';
+ return head('Resumen',`<span class="mut text-sm">${d}</span>`)+
+ `<div class="card mb-3" style="background:linear-gradient(135deg,#065f46,#0f2a3d);border-color:#10b98155"><div class="text-emerald-100/80 text-sm">Total invertido en inventario</div><div class="text-4xl font-bold mt-1 tracking-tight">${m(inv)}</div>
+ <div class="grid grid-cols-2 gap-3 mt-4 text-sm"><div><div class="text-emerald-100/70 text-xs">Valor a precio de venta</div><b>${m(val)}</b></div><div><div class="text-emerald-100/70 text-xs">Ganancia potencial</div><b>${m(val-inv)}</b></div></div></div>
+ <div class="grid grid-cols-2 md:grid-cols-4 gap-3">${c('Ventas hoy',m(T(vd)),'text-emerald-400')}${c('Ganancia hoy',m(G(vd)),'text-emerald-400')}${c('Ventas del mes',m(T(vm)))}${c('Ganancia del mes',m(G(vm)),'text-emerald-400')}${c('Gastos del mes',m(g),'text-red-400')}${c('Por cobrar',m(sum(db.customers)))}${c('Por pagar',m(sum(db.suppliers)),'text-red-400')}${c('Productos',db.products.length)}</div>
  <div class="grid grid-cols-2 gap-3 my-4">
- <button class="btn py-4" onclick="view='pos';render();scanSell()">📷 Nueva venta (escanear)</button>
- <button class="btnr py-4" onclick="txForm('out')">Nuevo gasto</button>
- <button class="btn2 py-4" onclick="view='inv';render();prodForm()">+ Agregar producto</button>
- <button class="btn2 py-4" onclick="view='sup';render();supForm()">+ Registrar proveedor</button></div>
- <div class="card"><b>⚠️ Stock bajo (${low.length})</b>${low.map(p=>`<div class="flex justify-between py-1 border-b border-slate-700 text-sm"><span>${esc(p.name)}</span><span class="text-red-400">${p.stock} uds</span></div>`).join('')||'<p class="mut text-sm mt-1">Todo en orden.</p>'}</div>`;
+ <button class="btn ${qb}" onclick="view='pos';render();scanSell()">${ic('scan')} Nueva venta</button>
+ <button class="btnr ${qb}" onclick="txForm('out')">${ic('wallet')} Nuevo gasto</button>
+ <button class="btn2 ${qb}" onclick="view='inv';render();prodForm()">${ic('plus')} Agregar producto</button>
+ <button class="btn2 ${qb}" onclick="view='sup';render();supForm()">${ic('truck')} Registrar proveedor</button></div>
+ <div class="card mb-3"><b>Stock bajo (${low.length})</b>${low.map(p=>`<div class="flex items-center gap-3 py-2 border-b border-slate-700/60 text-sm">${pic(p,'w-9 h-9')}<span class="flex-1 truncate">${esc(p.name)}</span><span class="text-red-400 font-medium">${p.stock} uds</span></div>`).join('')||'<p class="mut text-sm mt-1">Todo en orden.</p>'}</div>
+ <div class="card"><b>Últimas ventas</b>${db.sales.slice(-5).reverse().map(x=>`<div class="flex justify-between py-2 border-b border-slate-700/60 text-sm"><span class="mut">${x.d} · ${x.items.reduce((a,i)=>a+i.qty,0)} uds</span><span><b>${m(x.total)}</b> <span class="text-emerald-400 ml-2">+${m(sp(x))}</span></span></div>`).join('')||'<p class="mut text-sm mt-1">Aún no hay ventas.</p>'}</div>`;
 }
 
 /* ---------- INVENTARIO ---------- */
 function vInv(){
  const l=db.products.filter(p=>(p.name+p.sku+p.cat).toLowerCase().includes(q.toLowerCase()));
- return head('Inventario','<button class="btn" onclick="prodForm()">+ Producto</button>')+
- `<div class="flex gap-2 mb-3"><input class="inp" placeholder="Buscar nombre, código o categoría" value="${esc(q)}" onchange="q=this.value;render()"><button class="btn" onclick="scan(c=>{q=c;render()})">📷</button></div>`+
- (l.map(p=>`<div class="card mb-2"><div class="flex justify-between gap-2"><div><b>${esc(p.name)}</b><div class="mut text-xs">${esc(p.sku)||'Sin código'} · ${esc(p.cat)}</div><div class="text-sm mt-1">Costo ${m(p.cost)} · Venta <b class="text-emerald-400">${m(p.price)}</b></div></div>
- <span class="h-fit px-2 py-1 rounded-lg text-sm font-bold ${p.stock<=LOW?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}">${p.stock} uds</span></div>
- <div class="flex gap-2 mt-2 text-sm"><button class="btn2" onclick="prodForm('${p.id}')">Editar</button><button class="btn2 text-red-400" onclick="delP('${p.id}')">Eliminar</button></div></div>`).join('')||empty());
+ return head('Inventario',`<button class="btn flex items-center gap-1" onclick="prodForm()">${ic('plus',18)} Producto</button>`)+
+ `<div class="flex gap-2 mb-4"><input class="inp" placeholder="Buscar nombre, código o categoría" value="${esc(q)}" onchange="q=this.value;render()"><button class="btn" onclick="scan(c=>{q=c;render()})">${ic('scan')}</button></div>`+
+ (l.map(p=>{const u=p.price-p.cost,pc=p.cost>0?u/p.cost*100:null,lw=p.stock<=LOW;
+ return `<div class="card mb-3"><div class="flex gap-3">${pic(p,'w-20 h-20 shrink-0')}<div class="flex-1 min-w-0"><div class="flex justify-between gap-2"><b class="truncate">${esc(p.name)}</b><span class="shrink-0 h-fit px-2 py-0.5 rounded-lg text-xs font-semibold ${lw?'bg-red-500/15 text-red-400':'bg-emerald-500/15 text-emerald-400'}">${p.stock} uds</span></div>
+ <div class="mut text-xs">${esc(p.sku)||'Sin código'} · ${esc(p.cat)}</div>
+ <div class="grid grid-cols-3 gap-2 mt-2 text-xs"><div><div class="mut">Costo</div><b>${m(p.cost)}</b></div><div><div class="mut">Venta</div><b class="text-emerald-400">${m(p.price)}</b></div><div><div class="mut">Ganancia</div><b class="${u>=0?'text-emerald-400':'text-red-400'}">${pc===null?'—':pc.toFixed(1)+'%'}</b></div></div></div></div>
+ <div class="flex justify-between items-center mt-3 text-xs"><span class="mut">Ganancia/ud ${m(u)} · Invertido ${m(p.cost*p.stock)}</span><div class="flex gap-2"><button class="btn2 !py-1.5 !px-3" onclick="prodForm('${p.id}')">Editar</button><button class="btn2 !py-1.5 !px-3 text-red-400" onclick="delP('${p.id}')">Eliminar</button></div></div></div>`}).join('')||empty());
 }
 function prodForm(id,dr){
- const p=dr||db.products.find(x=>x.id===id)||{};id=id||'';
- modal(`<h3 class="font-bold text-lg mb-3">${id?'Editar':'Nuevo'} producto</h3><div class="space-y-2">
+ const p=dr||db.products.find(x=>x.id===id)||{};id=id||'';window._img=p.img||'';
+ modal(`<h3 class="font-semibold text-lg mb-3">${id?'Editar':'Nuevo'} producto</h3><div class="space-y-2">
+ <label class="flex items-center gap-3 cursor-pointer"><span id="pv">${pic({img:window._img},'w-20 h-20')}</span><span class="btn2 flex items-center gap-2">${ic('camera',18)} Tomar o subir foto</span><input type="file" accept="image/*" class="hidden" onchange="pickImg(this)"></label>
  <input id="pn" class="inp" placeholder="Nombre" value="${esc(p.name)}">
- <div class="flex gap-2"><input id="ps" class="inp" placeholder="Código de barras (SKU)" value="${esc(p.sku)}"><button class="btn" onclick="scanSku('${id}')">📷 Escanear</button></div>
- <div class="grid grid-cols-2 gap-2"><input id="pc" type="number" step="0.01" class="inp" placeholder="Precio de costo" value="${p.cost??''}"><input id="pp" type="number" step="0.01" class="inp" placeholder="Precio de venta" value="${p.price??''}"></div>
+ <div class="flex gap-2"><input id="ps" class="inp" placeholder="Código de barras (SKU)" value="${esc(p.sku)}"><button class="btn flex items-center gap-1 shrink-0" onclick="scanSku('${id}')">${ic('scan',18)} Escanear</button></div>
+ <div class="grid grid-cols-2 gap-2"><input id="pc" type="number" step="0.01" class="inp" oninput="gpv()" placeholder="Precio de costo" value="${p.cost??''}"><input id="pp" type="number" step="0.01" class="inp" oninput="gpv()" placeholder="Precio de venta" value="${p.price??''}"></div>
+ <p id="gp" class="text-sm text-emerald-400 min-h-[1.25rem]"></p>
  <div class="grid grid-cols-2 gap-2"><input id="pk" type="number" class="inp" placeholder="Stock" value="${p.stock??''}"><input id="pt" class="inp" placeholder="Categoría" value="${esc(p.cat)}"></div>
- <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveP('${id}')">Guardar</button></div></div>`);
+ <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveP('${id}')">Guardar</button></div></div>`);gpv();
 }
-const readP=()=>({name:$('pn').value.trim(),sku:$('ps').value.trim(),cost:+$('pc').value||0,price:+$('pp').value||0,stock:+$('pk').value||0,cat:$('pt').value.trim()||'General'});
+function gpv(){const c=+$('pc').value,p=+$('pp').value;$('gp').textContent=c>0&&p>0?`Ganancia: ${m(p-c)} por unidad (${((p-c)/c*100).toFixed(1)}% sobre el costo)`:''}
+function pickImg(inp){
+ const f=inp.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,900/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);window._img=c.toDataURL('image/jpeg',.8);$('pv').innerHTML=pic({img:window._img},'w-20 h-20')};im.src=r.result};
+ r.readAsDataURL(f);
+}
+const readP=()=>({name:$('pn').value.trim(),sku:$('ps').value.trim(),cost:+$('pc').value||0,price:+$('pp').value||0,stock:+$('pk').value||0,cat:$('pt').value.trim()||'General',img:window._img||''});
 function scanSku(id){const d=readP();scan(c=>{d.sku=c;prodForm(id,d)})}
-function saveP(id){
+async function saveP(id){
  const d=readP();if(!d.name)return toast('Escribe el nombre');
  if(d.sku&&db.products.some(x=>x.sku===d.sku&&x.id!==id))return toast('Ese código ya existe');
- if(id)Object.assign(db.products.find(x=>x.id===id),d);else db.products.push({id:uid(),...d});
+ const old=id?db.products.find(x=>x.id===id).img:'';
+ if(d.img.startsWith('data:')){toast('Subiendo foto...');const u=await upImg(d.img);if(u){if(old)rmImg(old);d.img=u}else d.img=old}
+ if(id)Object.assign(db.products.find(x=>x.id===id),d);else{id=uid();db.products.push({id,...d})}
  save();closeM();render();toast('Producto guardado');
 }
-function delP(id){if(confirm('¿Eliminar producto?')){db.products=db.products.filter(x=>x.id!==id);save();render()}}
+function delP(id){if(confirm('¿Eliminar producto?')){rmImg((db.products.find(x=>x.id===id)||{}).img);db.products=db.products.filter(x=>x.id!==id);save();render()}}
 
 /* ---------- ESCÁNER ---------- */
 function scan(cb){
@@ -126,16 +166,17 @@ function manual(){const c=$('mc').value.trim();if(!c)return;const f=window._cb;c
 /* ---------- VENDER ---------- */
 function vPos(){
  const l=db.products.filter(p=>(p.name+p.sku).toLowerCase().includes(q.toLowerCase())).slice(0,30);
- const tot=cart.reduce((s,i)=>s+i.qty*i.price,0);
- return head('Punto de venta')+`<button class="btn w-full py-4 text-lg mb-3" onclick="scanSell()">📷 Escanear producto para vender</button>
+ const tot=cart.reduce((s,i)=>s+i.qty*i.price,0),gan=cart.reduce((s,i)=>s+i.qty*(i.price-i.cost),0);
+ return head('Punto de venta')+`<button class="btn w-full py-4 mb-3 flex items-center justify-center gap-2" onclick="scanSell()">${ic('scan')} Escanear producto para vender</button>
  <input class="inp mb-3" placeholder="Buscar producto..." value="${esc(q)}" onchange="q=this.value;render()">
- <div class="flex gap-2 overflow-x-auto pb-2 mb-3">${l.map(p=>`<button class="card shrink-0 text-left text-sm" onclick="addCart('${p.id}')"><b>${esc(p.name)}</b><div class="text-emerald-400">${m(p.price)}</div><div class="mut text-xs">${p.stock} uds</div></button>`).join('')||'<span class="mut text-sm">Sin resultados</span>'}</div>
- <div class="card"><b>Carrito</b>${cart.map(i=>`<div class="flex items-center justify-between py-2 border-b border-slate-700"><div class="text-sm"><b>${esc(i.name)}</b><div class="mut">${m(i.price)}</div></div>
- <div class="flex items-center gap-2"><button class="btn2 px-3" onclick="chg('${i.id}',-1)">−</button><b>${i.qty}</b><button class="btn2 px-3" onclick="chg('${i.id}',1)">+</button></div></div>`).join('')||'<p class="mut text-sm py-3">Carrito vacío.</p>'}
- <div class="flex justify-between text-xl font-bold my-3"><span>Total</span><span class="text-emerald-400">${m(tot)}</span></div>
+ <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">${l.map(p=>`<button class="card !p-2 text-left" onclick="addCart('${p.id}')">${pic(p,'w-full h-24')}<div class="text-sm font-medium mt-2 truncate">${esc(p.name)}</div><div class="flex justify-between text-xs"><b class="text-emerald-400">${m(p.price)}</b><span class="mut">${p.stock} uds</span></div></button>`).join('')||'<p class="mut text-sm col-span-full">Sin resultados.</p>'}</div>
+ <div class="card"><b>Carrito</b>${cart.map(i=>`<div class="flex items-center gap-3 py-2 border-b border-slate-700/60">${pic(db.products.find(p=>p.id===i.id)||{},'w-11 h-11')}<div class="flex-1 text-sm min-w-0"><b class="block truncate">${esc(i.name)}</b><span class="mut">${m(i.price)} · gana <span class="text-emerald-400">${m(i.price-i.cost)}</span></span></div>
+ <div class="flex items-center gap-2"><button class="btn2 !px-3 !py-1" onclick="chg('${i.id}',-1)">−</button><b>${i.qty}</b><button class="btn2 !px-3 !py-1" onclick="chg('${i.id}',1)">+</button></div></div>`).join('')||'<p class="mut text-sm py-3">Carrito vacío.</p>'}
+ <div class="flex justify-between text-xl font-semibold mt-3"><span>Total</span><span>${m(tot)}</span></div>
+ <div class="flex justify-between text-sm mb-3"><span class="mut">Ganancia de esta venta</span><b class="text-emerald-400">${m(gan)}</b></div>
  <div class="grid grid-cols-2 gap-2"><select class="inp" onchange="pay=this.value">${['Efectivo','Transferencia','Pago Móvil','Tarjeta','Fiado'].map(x=>`<option ${x===pay?'selected':''}>${x}</option>`).join('')}</select>
  <select class="inp" onchange="cust=this.value"><option value="">Cliente (opcional)</option>${db.customers.map(c=>`<option value="${c.id}" ${c.id===cust?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
- <button class="btn w-full mt-3 py-3" onclick="checkout()">Cobrar ${m(tot)}</button></div>`;
+ <button class="btn w-full mt-3 py-3.5" onclick="checkout()">Cobrar ${m(tot)}</button></div>`;
 }
 function addCart(id){
  const p=db.products.find(x=>x.id===id),i=cart.find(x=>x.id===id),n=(i?i.qty:0)+1;
@@ -147,39 +188,59 @@ function chg(id,d){const i=cart.find(x=>x.id===id),p=db.products.find(x=>x.id===
 function scanSell(){
  scan(code=>{
   const p=db.products.find(x=>x.sku===code);
-  if(!p)return modal(`<h3 class="font-bold">Producto no encontrado</h3><p class="mut my-2">Código: ${esc(code)}</p><div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cerrar</button><button class="btn flex-1" onclick="prodForm('',{sku:'${esc(code)}'})">Crear producto</button></div>`);
-  modal(`<h3 class="font-bold text-lg">${esc(p.name)}</h3><p class="mut text-sm">${esc(p.sku)} · ${esc(p.cat)}</p>
-  <div class="flex justify-between my-3"><span class="text-2xl font-bold text-emerald-400">${m(p.price)}</span><span class="${p.stock<=LOW?'text-red-400':'mut'}">${p.stock} en stock</span></div>
+  if(!p)return modal(`<h3 class="font-semibold">Producto no encontrado</h3><p class="mut my-2">Código: ${esc(code)}</p><div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cerrar</button><button class="btn flex-1" onclick="prodForm('',{sku:'${esc(code)}'})">Crear producto</button></div>`);
+  modal(`<div class="flex gap-3">${pic(p,'w-24 h-24 shrink-0')}<div><h3 class="font-semibold text-lg leading-tight">${esc(p.name)}</h3><p class="mut text-sm">${esc(p.sku)} · ${esc(p.cat)}</p><p class="text-sm mt-1 ${p.stock<=LOW?'text-red-400':'mut'}">${p.stock} en stock</p></div></div>
+  <div class="flex justify-between items-end my-4"><span class="text-3xl font-bold text-emerald-400">${m(p.price)}</span><span class="text-sm text-emerald-400">Ganancia ${m(p.price-p.cost)}</span></div>
   <div class="flex gap-2"><button class="btn2 flex-1" onclick="scanSell()">Escanear otro</button><button class="btn flex-1" onclick="addCart('${p.id}');closeM()">Agregar al carrito</button></div>`);
  });
 }
 function checkout(){
  if(!cart.length)return toast('El carrito está vacío');
  if(pay==='Fiado'&&!cust)return toast('Elige un cliente para fiar');
- const total=cart.reduce((s,i)=>s+i.qty*i.price,0);
- cart.forEach(i=>{db.products.find(x=>x.id===i.id).stock-=i.qty});
- db.sales.push({id:uid(),d:ld(),t:Date.now(),items:cart,total,method:pay,cust});
+ const total=cart.reduce((s,i)=>s+i.qty*i.price,0),profit=cart.reduce((s,i)=>s+i.qty*(i.price-i.cost),0),items=cart;
+ items.forEach(i=>{db.products.find(x=>x.id===i.id).stock-=i.qty});
+ db.sales.push({id:uid(),d:ld(),t:Date.now(),items,total,profit,method:pay,cust});
  if(pay==='Fiado'){const c=db.customers.find(x=>x.id===cust);c.balance+=total;c.hist.push({d:ld(),type:'Crédito (venta)',amount:total})}
- cart=[];save();render();toast('Venta registrada: '+m(total));
+ cart=[];save();render();
+ modal(`<div class="text-center mb-3"><div class="w-14 h-14 mx-auto rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-2">${ic('check',28)}</div><h3 class="font-semibold text-lg">Venta registrada</h3><p class="mut text-sm">${esc(pay)}</p></div>
+ ${items.map(i=>`<div class="flex justify-between text-sm py-1.5 border-b border-slate-700/60"><span>${i.qty} × ${esc(i.name)}</span><span>${m(i.qty*i.price)} <span class="text-emerald-400 ml-1">+${m(i.qty*(i.price-i.cost))}</span></span></div>`).join('')}
+ <div class="flex justify-between text-xl font-semibold mt-3"><span>Total</span><span>${m(total)}</span></div>
+ <div class="flex justify-between text-lg mt-1"><span class="text-emerald-400">Ganancia de la venta</span><b class="text-emerald-400">${m(profit)}</b></div>
+ <button class="btn w-full mt-4" onclick="closeM()">Listo</button>`);
 }
 
 /* ---------- CLIENTES / PROVEEDORES ---------- */
 function vCus(){
- return head('Clientes','<button class="btn" onclick="cusForm()">+ Cliente</button>')+`<div class="card mb-3 flex justify-between"><span class="mut">Total que me deben</span><b class="text-red-400">${m(sum(db.customers))}</b></div>`+
- (db.customers.map(c=>`<div class="card mb-2"><div class="flex justify-between"><div><b>${esc(c.name)}</b><div class="mut text-sm">${esc(c.phone)}</div></div><b class="${c.balance>0?'text-red-400':'text-emerald-400'}">${m(c.balance)}</b></div>
- <div class="flex gap-2 mt-2 text-sm"><button class="btn2" onclick="mvForm('c','${c.id}','cred')">Fiar</button><button class="btn" onclick="mvForm('c','${c.id}','abono')">Abono</button><button class="btn2" onclick="hist('c','${c.id}')">Historial</button></div></div>`).join('')||empty());
+ return head('Clientes',`<button class="btn flex items-center gap-1" onclick="entForm('c')">${ic('plus',18)} Cliente</button>`)+`<div class="card mb-3 flex justify-between"><span class="mut">Total que me deben</span><b class="text-red-400">${m(sum(db.customers))}</b></div>`+
+ (db.customers.map(c=>`<div class="card mb-3"><div class="flex justify-between"><div><b>${esc(c.name)}</b><div class="mut text-sm">${esc(c.phone)}</div></div><b class="${c.balance>0?'text-red-400':'text-emerald-400'}">${m(c.balance)}</b></div>
+ <div class="flex gap-2 mt-3 text-sm flex-wrap"><button class="btn2" onclick="mvForm('c','${c.id}','cred')">Fiar</button><button class="btn" onclick="mvForm('c','${c.id}','abono')">Abono</button><button class="btn2" onclick="hist('c','${c.id}')">Historial</button><button class="btn2" onclick="entForm('c','${c.id}')">Editar</button></div></div>`).join('')||empty());
 }
-function cusForm(){modal(`<h3 class="font-bold text-lg mb-3">Nuevo cliente</h3><div class="space-y-2"><input id="cn" class="inp" placeholder="Nombre"><input id="cp" class="inp" placeholder="Teléfono">
- <div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveC()">Guardar</button></div></div>`)}
-function saveC(){const n=$('cn').value.trim();if(!n)return toast('Escribe el nombre');db.customers.push({id:uid(),name:n,phone:$('cp').value.trim(),balance:0,hist:[]});save();closeM();render()}
 function vSup(){
- return head('Proveedores','<button class="btn" onclick="supForm()">+ Proveedor</button>')+`<div class="card mb-3 flex justify-between"><span class="mut">Total que debo</span><b class="text-red-400">${m(sum(db.suppliers))}</b></div>`+
- (db.suppliers.map(s=>`<div class="card mb-2"><div class="flex justify-between"><div><b>${esc(s.name)}</b> <span class="mut text-sm">${esc(s.company)}</span><div class="mut text-sm">${esc(s.phone)}</div><div class="text-xs mut">Suministra: ${esc(s.supplies)||'—'}</div></div><b class="${s.balance>0?'text-red-400':'text-emerald-400'}">${m(s.balance)}</b></div>
- <div class="flex gap-2 mt-2 text-sm flex-wrap"><button class="btn" onclick="purchForm('${s.id}')">Registrar compra</button><button class="btn2" onclick="mvForm('s','${s.id}','abono')">Pagar deuda</button><button class="btn2" onclick="hist('s','${s.id}')">Historial</button></div></div>`).join('')||empty());
+ return head('Proveedores',`<button class="btn flex items-center gap-1" onclick="entForm('s')">${ic('plus',18)} Proveedor</button>`)+`<div class="card mb-3 flex justify-between"><span class="mut">Total que debo</span><b class="text-red-400">${m(sum(db.suppliers))}</b></div>`+
+ (db.suppliers.map(x=>`<div class="card mb-3"><div class="flex justify-between"><div><b>${esc(x.name)}</b> <span class="mut text-sm">${esc(x.company)}</span><div class="mut text-sm">${esc(x.phone)}</div><div class="text-xs mut">Suministra: ${esc(x.supplies)||'—'}</div></div><b class="${x.balance>0?'text-red-400':'text-emerald-400'}">${m(x.balance)}</b></div>
+ <div class="flex gap-2 mt-3 text-sm flex-wrap"><button class="btn" onclick="purchForm('${x.id}')">Registrar compra</button><button class="btn2" onclick="mvForm('s','${x.id}','abono')">Pagar deuda</button><button class="btn2" onclick="hist('s','${x.id}')">Historial</button><button class="btn2" onclick="entForm('s','${x.id}')">Editar</button></div></div>`).join('')||empty());
 }
-function supForm(){modal(`<h3 class="font-bold text-lg mb-3">Nuevo proveedor</h3><div class="space-y-2"><input id="sn" class="inp" placeholder="Nombre"><input id="sp" class="inp" placeholder="Teléfono"><input id="sc" class="inp" placeholder="Empresa"><input id="ss" class="inp" placeholder="Productos que suministra">
- <div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveS()">Guardar</button></div></div>`)}
-function saveS(){const n=$('sn').value.trim();if(!n)return toast('Escribe el nombre');db.suppliers.push({id:uid(),name:n,phone:$('sp').value.trim(),company:$('sc').value.trim(),supplies:$('ss').value.trim(),balance:0,hist:[]});save();closeM();render()}
+const cusForm=()=>entForm('c'),supForm=()=>entForm('s');
+function entForm(t,id){
+ const e=ent(t,id)||{},sp_=t==='s';
+ modal(`<h3 class="font-semibold text-lg mb-3">${id?'Editar':'Nuevo'} ${sp_?'proveedor':'cliente'}</h3><div class="space-y-2">
+ <input id="en" class="inp" placeholder="Nombre" value="${esc(e.name)}"><input id="ep" class="inp" placeholder="Teléfono" value="${esc(e.phone)}">
+ ${sp_?`<input id="ec" class="inp" placeholder="Empresa" value="${esc(e.company)}"><input id="es" class="inp" placeholder="Productos que suministra" value="${esc(e.supplies)}">`:''}
+ ${id?`<label class="mut text-xs">${sp_?'Saldo que les debo':'Saldo que me debe'}</label><input id="eb" type="number" step="0.01" class="inp" value="${e.balance}">`:''}
+ <div class="flex gap-2 pt-2">${id?`<button class="btnr" onclick="delE('${t}','${id}')">Eliminar</button>`:''}<button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveE('${t}','${id||''}')">Guardar</button></div></div>`);
+}
+function saveE(t,id){
+ const n=$('en').value.trim();if(!n)return toast('Escribe el nombre');
+ const d={name:n,phone:$('ep').value.trim()};if(t==='s'){d.company=$('ec').value.trim();d.supplies=$('es').value.trim()}
+ if(id){const e=ent(t,id);if($('eb')){d.balance=+$('eb').value||0;if(d.balance!==e.balance)e.hist.push({d:ld(),type:'Ajuste de saldo',amount:d.balance-e.balance})}Object.assign(e,d)}
+ else(t==='c'?db.customers:db.suppliers).push({id:uid(),balance:0,hist:[],...d});
+ save();closeM();render();toast('Guardado');
+}
+function delE(t,id){
+ if(!confirm('¿Eliminar? También se borrará su historial.'))return;
+ const k=t==='c'?'customers':'suppliers';db[k]=db[k].filter(x=>x.id!==id);if(t==='s')db.purchases=db.purchases.filter(p=>p.sid!==id);
+ save();closeM();render();toast('Eliminado');
+}
 const ent=(t,id)=>(t==='c'?db.customers:db.suppliers).find(x=>x.id===id);
 function mvForm(t,id,k){
  const e=ent(t,id),ab=k==='abono';
@@ -195,7 +256,17 @@ function doMv(t,id,k){
  else{e.balance+=a;e.hist.push({d:ld(),type:'Crédito',amount:a,note})}
  save();closeM();render();toast('Registrado');
 }
-function hist(t,id){const e=ent(t,id);modal(`<h3 class="font-bold text-lg mb-2">Historial: ${esc(e.name)}</h3>${e.hist.slice().reverse().map(h=>`<div class="flex justify-between py-2 border-b border-slate-700 text-sm"><span>${h.d} · ${esc(h.type)} <span class="mut">${esc(h.note)}</span></span><b>${m(h.amount)}</b></div>`).join('')||empty()}<button class="btn2 w-full mt-3" onclick="closeM()">Cerrar</button>`)}
+function hist(t,id){
+ const e=ent(t,id),pu=t==='s'?db.purchases.filter(p=>p.sid===id).slice().reverse():[];
+ modal(`<h3 class="font-semibold text-lg mb-2">Historial: ${esc(e.name)}</h3>${t==='s'?`<b class="text-sm">Compras</b>`+(pu.map(p=>`<div class="flex justify-between items-center py-2 border-b border-slate-700/60 text-sm"><span>${p.d} · ${p.lines.length} prod. <span class="mut">(pagado ${m(p.paid)})</span></span><span><b>${m(p.total)}</b> <button class="text-red-400 ml-2" onclick="delPurch('${p.id}')">Eliminar</button></span></div>`).join('')||'<p class="mut text-sm py-2">Sin compras.</p>')+'<b class="text-sm block mt-3">Movimientos de saldo</b>':''}
+ ${e.hist.slice().reverse().map(h=>`<div class="flex justify-between py-2 border-b border-slate-700/60 text-sm"><span>${h.d} · ${esc(h.type)} <span class="mut">${esc(h.note)}</span></span><b>${m(h.amount)}</b></div>`).join('')||empty()}<button class="btn2 w-full mt-3" onclick="closeM()">Cerrar</button>`);
+}
+function delPurch(id){
+ const p=db.purchases.find(x=>x.id===id);if(!confirm('¿Eliminar la compra? Se restará el stock y la deuda asociada.'))return;
+ p.lines.forEach(l=>{const q=db.products.find(x=>x.id===l.pid);if(q)q.stock=Math.max(0,q.stock-l.qty)});
+ const sp_=ent('s',p.sid);if(sp_)sp_.balance=Math.max(0,sp_.balance-(p.total-p.paid));
+ db.purchases=db.purchases.filter(x=>x.id!==id);db.tx=db.tx.filter(x=>x.ref!==id);save();closeM();render();toast('Compra eliminada');
+}
 
 /* ---------- COMPRAS A PROVEEDOR ---------- */
 function purchForm(sid){
@@ -220,34 +291,96 @@ function confP(){
  const paid=P.type==='Contado'?total:Math.min(+($('pd')?.value)||0,total);
  P.lines.forEach(l=>{const p=db.products.find(x=>x.id===l.pid);p.stock+=l.qty;p.cost=l.cost});
  s.balance+=total-paid;s.hist.push({d:ld(),type:'Compra '+P.type.toLowerCase(),amount:total,note:'Pagado '+m(paid)});
- db.purchases.push({id:uid(),d:ld(),sid:P.sid,lines:P.lines,total,paid});
- if(paid>0)db.tx.push({id:uid(),d:ld(),type:'out',amount:paid,cat:'Compra de mercancía',method:'Efectivo',note:s.name});
+ const pid=uid();db.purchases.push({id:pid,d:ld(),sid:P.sid,lines:P.lines,total,paid});
+ if(paid>0)db.tx.push({id:uid(),ref:pid,d:ld(),type:'out',amount:paid,cat:'Compra de mercancía',method:'Efectivo',note:s.name});
  save();closeM();render();toast('Compra registrada, stock actualizado');
 }
 
 /* ---------- CAJA Y RESPALDO ---------- */
+const so=(a,v)=>a.map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('');
 function vCash(){
  const d=ld(),t=db.tx.filter(x=>x.d===d),i=t.filter(x=>x.type==='in').reduce((s,x)=>s+x.amount,0),o=t.filter(x=>x.type==='out').reduce((s,x)=>s+x.amount,0);
  return head('Caja diaria')+`<div class="grid grid-cols-2 gap-3 mb-3"><div class="card"><div class="mut text-xs">Ingresos hoy</div><b class="text-emerald-400 text-lg">${m(i)}</b></div><div class="card"><div class="mut text-xs">Egresos hoy</div><b class="text-red-400 text-lg">${m(o)}</b></div></div>
- <div class="grid grid-cols-2 gap-3 mb-4"><button class="btn" onclick="txForm('in')">+ Ingreso</button><button class="btnr" onclick="txForm('out')">+ Gasto</button></div>
- ${db.tx.slice().reverse().slice(0,30).map(x=>`<div class="card mb-2 flex justify-between text-sm"><div><b>${esc(x.cat)}</b><div class="mut">${x.d} · ${esc(x.method)} ${esc(x.note)}</div></div><b class="${x.type==='in'?'text-emerald-400':'text-red-400'}">${x.type==='in'?'+':'−'}${m(x.amount)}</b></div>`).join('')||empty()}
- <div class="card mt-4 space-y-2"><b>Respaldo de datos</b><div class="grid grid-cols-2 gap-2"><button class="btn" onclick="exportDB()">⬇ Exportar JSON</button><button class="btn2" onclick="$('imp').click()">⬆ Importar JSON</button></div>
+ <div class="grid grid-cols-2 gap-3 mb-5"><button class="btn" onclick="txForm('in')">+ Ingreso</button><button class="btnr" onclick="txForm('out')">+ Gasto</button></div>
+ <h3 class="font-semibold mb-2">Movimientos</h3>${db.tx.slice().reverse().slice(0,30).map(x=>`<div class="card mb-2 flex justify-between items-center text-sm"><div><b>${esc(x.cat)}</b><div class="mut">${x.d} · ${esc(x.method)} ${esc(x.note)}</div></div><div class="text-right"><b class="${x.type==='in'?'text-emerald-400':'text-red-400'}">${x.type==='in'?'+':'−'}${m(x.amount)}</b><div class="flex gap-3 justify-end mt-1 text-xs"><button class="text-emerald-400" onclick="txForm('${x.type}','${x.id}')">Editar</button><button class="text-red-400" onclick="delTx('${x.id}')">Eliminar</button></div></div></div>`).join('')||empty()}
+ <h3 class="font-semibold mt-5 mb-2">Ventas</h3>${db.sales.slice().reverse().slice(0,30).map(x=>`<div class="card mb-2 flex justify-between items-center text-sm"><div><b>${m(x.total)}</b> <span class="text-emerald-400">+${m(sp(x))}</span><div class="mut">${x.d} · ${esc(x.method)} · ${x.items.reduce((a,i)=>a+i.qty,0)} uds</div></div><button class="text-red-400 text-xs" onclick="delSale('${x.id}')">Eliminar</button></div>`).join('')||empty()}
+ <div class="card mt-5 space-y-2"><b>Respaldo de datos</b><p id="st" class="mut text-xs"></p><div class="grid grid-cols-2 gap-2"><button class="btn" onclick="exportDB()">Exportar respaldo</button><button class="btn2" onclick="$('imp').click()">Importar respaldo</button></div>
  <input id="imp" type="file" accept="application/json" class="hidden" onchange="importDB(this)"><button class="btnr w-full" onclick="logout()">Cerrar sesión</button></div>`;
 }
-function txForm(type){
- const cats=type==='in'?['Venta libre','Servicio','Otros ingresos']:['Alquiler','Servicios','Transporte','Nómina','Mercancía','Otros gastos'];
- modal(`<h3 class="font-bold text-lg mb-3">${type==='in'?'Nuevo ingreso':'Nuevo gasto'}</h3><div class="space-y-2"><input id="ta" type="number" step="0.01" class="inp" placeholder="Monto">
- <select id="tc" class="inp">${opts(cats)}</select><select id="tm" class="inp">${opts(METHODS)}</select><input id="tn" class="inp" placeholder="Nota (opcional)">
- <div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveTx('${type}')">Guardar</button></div></div>`);
+function est(){const el=$('st');if(el)el.textContent='Datos sincronizados en la nube (Supabase) entre todos tus dispositivos.'}
+function txForm(type,id){
+ const e=db.tx.find(x=>x.id===id)||{},cats=[...new Set([...(type==='in'?['Venta libre','Servicio','Otros ingresos']:['Alquiler','Servicios','Transporte','Nómina','Mercancía','Otros gastos']),...(e.cat?[e.cat]:[])])];
+ modal(`<h3 class="font-semibold text-lg mb-3">${id?'Editar':'Nuevo'} ${type==='in'?'ingreso':'gasto'}</h3><div class="space-y-2"><input id="ta" type="number" step="0.01" class="inp" placeholder="Monto" value="${e.amount??''}">
+ <select id="tc" class="inp">${so(cats,e.cat)}</select><select id="tm" class="inp">${so(METHODS,e.method)}</select><input id="tn" class="inp" placeholder="Nota (opcional)" value="${esc(e.note)}">
+ <div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveTx('${type}','${id||''}')">Guardar</button></div></div>`);
 }
-function saveTx(type){const a=+$('ta').value;if(!(a>0))return toast('Monto inválido');db.tx.push({id:uid(),d:ld(),type,amount:a,cat:$('tc').value,method:$('tm').value,note:$('tn').value.trim()});save();closeM();render();toast('Guardado')}
+function saveTx(type,id){const a=+$('ta').value;if(!(a>0))return toast('Monto inválido');const d={amount:a,cat:$('tc').value,method:$('tm').value,note:$('tn').value.trim()};if(id)Object.assign(db.tx.find(x=>x.id===id),d);else db.tx.push({id:uid(),d:ld(),type,...d});save();closeM();render();toast('Guardado')}
+function delTx(id){if(confirm('¿Eliminar este movimiento?')){db.tx=db.tx.filter(x=>x.id!==id);save();render()}}
+function delSale(id){
+ const x=db.sales.find(v=>v.id===id);if(!confirm('¿Eliminar la venta y devolver las unidades al stock?'))return;
+ x.items.forEach(i=>{const p=db.products.find(v=>v.id===i.id);if(p)p.stock+=i.qty});
+ if(x.method==='Fiado'){const c=db.customers.find(v=>v.id===x.cust);if(c){c.balance=Math.max(0,c.balance-x.total);c.hist.push({d:ld(),type:'Venta anulada',amount:x.total})}}
+ db.sales=db.sales.filter(v=>v.id!==id);save();render();toast('Venta eliminada');
+}
 function exportDB(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download='cheetah-wheels-respaldo-'+ld()+'.json';a.click()}
 function importDB(inp){
  const f=inp.files[0];if(!f)return;const r=new FileReader();
  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.products||!d.sales||!d.customers||!d.suppliers)throw 0;
   if(!confirm('Esto reemplazará todos los datos actuales. ¿Continuar?'))return;
-  db={tx:[],purchases:[],...d};save();render();toast('Respaldo importado')}catch(e){toast('Archivo de respaldo inválido')}};
+  setDB(d).then(()=>{render();toast('Respaldo importado')})}catch(e){toast('Archivo de respaldo inválido')}};
  r.readAsText(f);
 }
-boot();
+/* ---------- NUBE (Supabase) ---------- */
+const last=new Map(),fail=e=>toast('Error de sincronización: '+(e.message||'sin conexión'));let qq=Promise.resolve();
+function save(){
+ const up=[],seen=new Set();
+ COLS.forEach(c=>db[c].forEach(x=>{const k=c+'|'+x.id;seen.add(k);const j=JSON.stringify(x);if(last.get(k)!==j){last.set(k,j);up.push({col:c,id:x.id,data:x})}}));
+ const del=[...last.keys()].filter(k=>!seen.has(k));del.forEach(k=>last.delete(k));
+ qq=qq.then(async()=>{
+  for(let i=0;i<up.length;i+=200){const {error}=await sb.from('records').upsert(up.slice(i,i+200),{onConflict:'col,id'});if(error){up.slice(i).forEach(r=>last.delete(r.col+'|'+r.id));return fail(error)}}
+  for(const k of del){const [c,id]=k.split('|'),{error}=await sb.from('records').delete().eq('col',c).eq('id',id);if(error){last.set(k,'?');fail(error)}}
+ });
+}
+async function loadAll(){
+ COLS.forEach(c=>db[c]=[]);last.clear();
+ for(let a=0;;a+=1000){
+  const {data,error}=await sb.from('records').select('col,id,data').order('seq').range(a,a+999);
+  if(error){fail(error);break}
+  data.forEach(r=>{if(db[r.col]){db[r.col].push(r.data);last.set(r.col+'|'+r.id,JSON.stringify(r.data))}});
+  if(data.length<1000)break;
+ }
+}
+function applyRemote(p){
+ const c=(p.new&&p.new.col)||(p.old&&p.old.col),id=(p.new&&p.new.id)||(p.old&&p.old.id);if(!COLS.includes(c))return;
+ const arr=db[c],k=c+'|'+id,i=arr.findIndex(x=>x.id===id);
+ if(p.eventType==='DELETE'){if(i>=0)arr.splice(i,1);last.delete(k)}
+ else{const j=JSON.stringify(p.new.data);if(last.get(k)===j)return;last.set(k,j);if(i>=0)arr[i]=p.new.data;else arr.push(p.new.data)}
+ render();
+}
+function subscribe(){if(subscribed)return;subscribed=true;sb.channel('cw').on('postgres_changes',{event:'*',schema:'public',table:'records'},applyRemote).subscribe()}
+async function upImg(du){
+ try{const b=await (await fetch(du)).blob(),p=uid()+'.jpg',{error}=await sb.storage.from('fotos').upload(p,b,{contentType:'image/jpeg'});if(error)throw error;return sb.storage.from('fotos').getPublicUrl(p).data.publicUrl}
+ catch(e){toast('No se pudo subir la foto');return null}
+}
+function rmImg(u){const p=(u||'').split('/fotos/')[1];if(p)sb.storage.from('fotos').remove([p])}
+async function setDB(d){
+ toast('Subiendo datos…');
+ for(const p of d.products||[])if(p.img&&p.img.startsWith('data:'))p.img=(await upImg(p.img))||'';
+ await qq;await sb.from('records').delete().neq('id','');last.clear();
+ db=Object.fromEntries(COLS.map(c=>[c,d[c]||[]]));save();await qq;
+}
+function localData(){return new Promise(ok=>{
+ const r=indexedDB.open('cheetah_wheels');r.onupgradeneeded=()=>r.transaction.abort();r.onerror=()=>ok(null);
+ r.onsuccess=()=>{const d=r.result;if(!d.objectStoreNames.contains('kv')||!d.objectStoreNames.contains('imgs')){d.close();return ok(null)}
+  const t=d.transaction(['kv','imgs']),a=t.objectStore('kv'),b=t.objectStore('imgs'),ak=a.getAllKeys(),av=a.getAll(),bk=b.getAllKeys(),bv=b.getAll();
+  t.oncomplete=()=>{const o={},im={};ak.result.forEach((k,i)=>o[k]=av.result[i]);bk.result.forEach((k,i)=>im[k]=bv.result[i]);(o.products||[]).forEach(p=>p.img=im[p.id]||'');d.close();ok(o)};t.onerror=()=>ok(null)}
+})}
+function init(){
+ if(!SUPABASE_URL.startsWith('https://')||SUPABASE_KEY.length<30){
+  document.body.innerHTML='<div class="p-6 max-w-lg mx-auto"><div class="card"><h2 class="text-xl font-semibold mb-2">Falta conectar la nube</h2><p class="mut text-sm">Abre index.html y pega tu Project URL y tu anon key de Supabase en las constantes SUPABASE_URL y SUPABASE_KEY, al inicio del script.</p></div></div>';return}
+ sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&$('app').style.display==='block')qq.then(loadAll).then(render)});
+ boot();
+}
+init();
 </script></body></html>
