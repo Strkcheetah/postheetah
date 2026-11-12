@@ -17,6 +17,30 @@ body{background:radial-gradient(900px 500px at 85% -10%,#10b98118,transparent),#
 .inp:focus{outline:2px solid #10b981;border-color:transparent}.mut{color:#94a3b8}
 .thumb{object-fit:cover;border-radius:.8rem;background:#0f172a;border:1px solid #2a3a58}
 .ph{display:flex;align-items:center;justify-content:center;color:#475569}
+
+#main{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:.9rem;align-content:start}
+#main>*{margin:0!important}
+#main>:not(.card),#main>.card.full{grid-column:1/-1}
+.pos{display:grid;gap:1.25rem}
+@media(min-width:1024px){.pos{grid-template-columns:1fr 390px}.pos>.card{position:sticky;top:1rem;align-self:start}}
+@media(hover:hover){.card{transition:transform .2s,border-color .2s}.card:hover{border-color:#10b98166}.btn:hover{transform:translateY(-1px);filter:brightness(1.08)}}
+@keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fin{from{opacity:0}to{opacity:1}}
+@keyframes grow{from{width:0}}
+#main.anim>*{animation:up .45s cubic-bezier(.2,.8,.2,1) both}
+#main.anim>:nth-child(n+2){animation-delay:.06s}#main.anim>:nth-child(n+4){animation-delay:.12s}#main.anim>:nth-child(n+7){animation-delay:.18s}
+#mod>div{animation:fin .2s}#mod>div>.card{animation:pop .28s cubic-bezier(.2,.8,.2,1)}#toast>div{animation:pop .25s}
+#loader{transition:opacity .5s,visibility .5s}#loader.off{opacity:0;visibility:hidden}
+.bar{height:100%;width:40%;background:linear-gradient(90deg,transparent,#10b981,transparent);animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+.wh{transform-box:fill-box;transform-origin:center;animation:spin .4s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.car{animation:bob .3s ease-in-out infinite alternate}@keyframes bob{to{transform:translateY(-2px)}}
+.road{animation:road .35s linear infinite}@keyframes road{to{stroke-dashoffset:-38}}
+.spd{animation:spd .6s linear infinite}@keyframes spd{from{transform:translateX(30px);opacity:0}30%{opacity:.8}to{transform:translateX(-40px);opacity:0}}
+.dot{width:8px;height:8px;border-radius:50%;background:#10b981;animation:ping 2s infinite}@keyframes ping{0%{box-shadow:0 0 0 0 #10b981aa}70%,100%{box-shadow:0 0 0 8px #10b98100}}
+.prog{height:6px;border-radius:9px;background:#0f172a;overflow:hidden}.prog>i{display:block;height:100%;border-radius:9px;animation:grow 1s ease both}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style></head>
 <body>
 <div id="login" style="display:none" class="min-h-screen items-center justify-center p-6">
@@ -29,16 +53,35 @@ body{background:radial-gradient(900px 500px at 85% -10%,#10b98118,transparent),#
  </form>
 </div>
 <div id="app" style="display:none">
- <aside class="hidden md:flex fixed inset-y-0 left-0 w-56 bg-[#0c1424] border-r border-slate-800 flex-col p-4 gap-1" id="side"></aside>
- <main id="main" class="md:ml-56 p-4 pb-28 max-w-4xl mx-auto"></main>
+ <aside class="hidden md:flex fixed inset-y-0 left-0 w-64 bg-[#0c1424] border-r border-slate-800 flex-col p-4 gap-1" id="side"></aside>
+ <div class="md:pl-64"><main id="main" class="px-4 py-5 md:px-10 md:py-8 pb-28 md:pb-10 max-w-6xl mx-auto"></main></div>
  <nav id="bot" class="md:hidden fixed bottom-0 inset-x-0 bg-[#0c1424]/95 backdrop-blur border-t border-slate-800 flex justify-around pt-2" style="padding-bottom:max(.5rem,env(safe-area-inset-bottom))"></nav>
+</div>
+<div id="loader" class="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-[#0f172a]">
+ <div class="text-2xl font-semibold tracking-tight mb-1">Cheetah Wheels</div>
+ <svg viewBox="0 0 340 125" class="w-80 max-w-[88vw]">
+  <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#047857"/></linearGradient></defs>
+  <g stroke="#94a3b8" stroke-linecap="round" stroke-width="2"><line class="spd" x1="14" y1="60" x2="44" y2="60"/><line class="spd" style="animation-delay:.2s" x1="6" y1="78" x2="46" y2="78"/><line class="spd" style="animation-delay:.4s" x1="18" y1="94" x2="48" y2="94"/></g>
+  <line class="road" x1="0" y1="114" x2="340" y2="114" stroke="#334155" stroke-width="3" stroke-dasharray="22 16"/>
+  <g class="car">
+   <path d="M52 100C50 90 60 85 80 81L138 63C164 52 206 51 230 59L270 73C298 77 309 88 308 100Z" fill="url(#g1)"/>
+   <path d="M148 64C170 55 204 54 226 60L242 68L150 70Z" fill="#0b1220" stroke="#6ee7b7" stroke-width=".8"/>
+   <path d="M54 76L96 71L96 75L54 80Z" fill="#022c22"/><path d="M70 79L74 88M88 76L90 84" stroke="#022c22" stroke-width="3"/>
+   <path d="M116 92C170 86 222 86 252 92" stroke="#a7f3d0" stroke-width="2" fill="none"/><path d="M288 80L304 85L288 87Z" fill="#fde68a"/>
+   <circle cx="100" cy="96" r="20" fill="#0f172a"/><circle cx="262" cy="96" r="20" fill="#0f172a"/>
+   <circle cx="100" cy="96" r="15" fill="#0b1220" stroke="#cbd5e1" stroke-width="2"/><g class="wh"><circle cx="100" cy="96" r="9" fill="none" stroke="#64748b" stroke-width="1.5"/><path d="M100 87V105M91 96H109" stroke="#cbd5e1" stroke-width="2"/></g>
+   <circle cx="262" cy="96" r="15" fill="#0b1220" stroke="#cbd5e1" stroke-width="2"/><g class="wh"><circle cx="262" cy="96" r="9" fill="none" stroke="#64748b" stroke-width="1.5"/><path d="M262 87V105M253 96H271" stroke="#cbd5e1" stroke-width="2"/></g>
+  </g>
+ </svg>
+ <div id="ltxt" class="text-emerald-400 font-semibold tracking-[.3em] text-xs uppercase mt-1">Cargando</div>
+ <div class="w-56 h-1 rounded bg-slate-800 mt-3 overflow-hidden"><div class="bar"></div></div>
 </div>
 <div id="mod"></div><div id="toast" class="fixed top-4 inset-x-0 flex justify-center z-[60] pointer-events-none"></div>
 <script>
 /* === CONFIGURACIÓN DE LA NUBE (Supabase): pega aquí tus dos datos === */
 const SUPABASE_URL='https://wwzkhfqfqucfeknvvkzz.supabase.co',SUPABASE_KEY='sb_publishable_5X1CZs8xPno6posImwHRWQ_6felfdEy';
-const LOW=5,COLS=['products','sales','tx','customers','suppliers','purchases'];let sb,subscribed=false;
-let db={products:[],sales:[],tx:[],customers:[],suppliers:[],purchases:[]};
+const LOW=5,COLS=['products','sales','tx','customers','suppliers','purchases','orders'];let sb,subscribed=false;
+let db={products:[],sales:[],tx:[],customers:[],suppliers:[],purchases:[],orders:[]};
 const $=id=>document.getElementById(id);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const m=n=>'$'+(+n||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -50,11 +93,11 @@ const empty=()=>'<p class="mut text-center py-8">Aún no hay registros.</p>';
 const METHODS=['Efectivo','Transferencia','Pago Móvil','Tarjeta','Otro'];
 const opts=a=>a.map(x=>`<option>${x}</option>`).join('');
 let view='home',cart=[],q='',scanner=null,pay='Efectivo',cust='',P=null;
-const IC={home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',box:'<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',cart:'<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h9.1a1 1 0 0 0 1-.8L21 7H6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.5.6 4 2.6 4 6"/>',truck:'<path d="M2 6h11v10H2zM13 9h4l4 4v3h-8"/><circle cx="6.5" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',wallet:'<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1"/>',scan:'<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/>',camera:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',plus:'<path d="M12 5v14M5 12h14"/>',image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-9 9"/>',check:'<path d="M5 12l5 5 9-10"/>'};
+const IC={home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',box:'<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',cart:'<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h9.1a1 1 0 0 0 1-.8L21 7H6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.5.6 4 2.6 4 6"/>',truck:'<path d="M2 6h11v10H2zM13 9h4l4 4v3h-8"/><circle cx="6.5" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',wallet:'<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1"/>',scan:'<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/>',camera:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',plus:'<path d="M12 5v14M5 12h14"/>',image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-9 9"/>',check:'<path d="M5 12l5 5 9-10"/>',bag:'<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>'};
 const ic=(n,z=20)=>`<svg width="${z}" height="${z}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[n]}</svg>`;
 const pic=(p,c='w-14 h-14')=>p.img?`<img src="${p.img}" class="thumb ${c}" alt="">`:`<div class="thumb ph ${c}">${ic('image',24)}</div>`;
 const sp=x=>x.profit??x.items.reduce((a,i)=>a+(i.price-i.cost)*i.qty,0);
-const NAV=[['home','home','Inicio'],['inv','box','Inventario'],['pos','cart','Vender'],['cus','users','Clientes'],['sup','truck','Proveedores'],['cash','wallet','Caja']];
+const NAV=[['home','home','Inicio'],['inv','box','Inventario','Stock'],['pos','cart','Vender'],['ord','bag','Bajo pedido','Pedidos'],['cus','users','Clientes'],['sup','truck','Proveedores','Provee.'],['cash','wallet','Caja']];
 
 function toast(t){$('toast').innerHTML=`<div class="bg-emerald-500 text-[#04261b] font-semibold px-4 py-2 rounded-xl shadow-lg">${esc(t)}</div>`;setTimeout(()=>$('toast').innerHTML='',2500)}
 function modal(h){$('mod').innerHTML=`<div class="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center" onclick="if(event.target===this)closeM()"><div class="card w-full md:max-w-lg max-h-[92vh] overflow-auto rounded-b-none md:rounded-b-2xl">${h}</div></div>`}
@@ -67,23 +110,26 @@ async function login(e){
  if(error)$('lerr').classList.remove('hidden');else boot();
 }
 async function logout(){await sb.auth.signOut();sb.removeAllChannels();subscribed=false;boot()}
+const loader=(on,t)=>{if(t)$('ltxt').textContent=t;$('loader').classList.toggle('off',!on)};
 async function boot(){
  const {data}=await sb.auth.getSession(),ok=!!data.session;
- $('login').style.display=ok?'none':'flex';$('app').style.display=ok?'block':'none';if(!ok)return;
- $('main').innerHTML='<p class="mut text-center p-10">Sincronizando…</p>';
+ $('login').style.display=ok?'none':'flex';$('app').style.display=ok?'block':'none';
+ if(!ok){loader(false);return}
+ loader(true,'Sincronizando');const t0=Date.now();
  await loadAll();
  if(!db.products.length&&!db.customers.length&&!db.sales.length&&!localStorage.getItem('cw_asked')){
   const L=await localData();localStorage.setItem('cw_asked','1');
   if(L&&((L.products||[]).length||(L.customers||[]).length||(L.sales||[]).length)&&confirm('Encontré datos guardados en este dispositivo. ¿Subirlos a la nube?'))await setDB(L);
  }
- render();subscribe();
+ await new Promise(r=>setTimeout(r,Math.max(0,1400-(Date.now()-t0))));
+ $('main').classList.add('anim');render();subscribe();loader(false);
 }
-function go(v){view=v;q='';render();scrollTo(0,0)}
+function go(v){view=v;q='';const e=$('main');e.classList.remove('anim');void e.offsetWidth;e.classList.add('anim');render();scrollTo(0,0)}
 
 function render(){
- $('side').innerHTML=`<div class="flex items-center gap-3 mb-6 px-1"><div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-[#04261b] font-extrabold flex items-center justify-center">CW</div><div><div class="font-semibold leading-tight">Cheetah Wheels</div><div class="mut text-xs">Gestión comercial</div></div></div>`+NAV.map(([k,i,t])=>`<button onclick="go('${k}')" class="flex items-center gap-3 text-left px-3 py-2.5 rounded-xl text-sm transition ${view===k?'bg-emerald-500/15 text-emerald-400 font-semibold':'mut hover:bg-slate-800'}">${ic(i)} ${t}</button>`).join('');
- $('bot').innerHTML=NAV.map(([k,i,t])=>`<button onclick="go('${k}')" class="flex flex-col items-center gap-0.5 text-[10px] px-1 ${view===k?'text-emerald-400 font-semibold':'mut'}">${ic(i,22)}${t}</button>`).join('');
- $('main').innerHTML=({home:vHome,inv:vInv,pos:vPos,cus:vCus,sup:vSup,cash:vCash})[view]();if(view==='cash')est();
+ $('side').innerHTML=`<div class="flex items-center gap-3 mb-6 px-1"><div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-[#04261b] font-extrabold flex items-center justify-center">CW</div><div><div class="font-semibold leading-tight">Cheetah Wheels</div><div class="mut text-xs">Gestión comercial</div></div></div>`+NAV.map(([k,i,t])=>`<button onclick="go('${k}')" class="flex items-center gap-3 text-left px-3 py-2.5 rounded-xl text-sm transition ${view===k?'bg-emerald-500/15 text-emerald-400 font-semibold':'mut hover:bg-slate-800'}">${ic(i)} ${t}</button>`).join('')+`<div class="mt-auto pt-4 border-t border-slate-800 text-xs mut flex items-center gap-2"><span class="dot"></span>Sincronizado<button class="ml-auto text-red-400" onclick="logout()">Salir</button></div>`;
+ $('bot').innerHTML=NAV.map(([k,i,t,sh])=>`<button onclick="go('${k}')" class="flex flex-col items-center gap-0.5 text-[10px] px-1 ${view===k?'text-emerald-400 font-semibold':'mut'}">${ic(i,22)}${sh||t}</button>`).join('');
+ $('main').innerHTML=({home:vHome,inv:vInv,pos:vPos,cus:vCus,sup:vSup,cash:vCash,ord:vOrd})[view]();if(view==='cash')est();
 }
 
 /* ---------- INICIO ---------- */
@@ -96,9 +142,9 @@ function vHome(){
  const c=(l,v,col='')=>`<div class="card"><div class="mut text-xs mb-1">${l}</div><div class="text-xl font-semibold ${col}">${v}</div></div>`;
  const qb='flex items-center justify-center gap-2 py-3.5';
  return head('Resumen',`<span class="mut text-sm">${d}</span>`)+
- `<div class="card mb-3" style="background:linear-gradient(135deg,#065f46,#0f2a3d);border-color:#10b98155"><div class="text-emerald-100/80 text-sm">Total invertido en inventario</div><div class="text-4xl font-bold mt-1 tracking-tight">${m(inv)}</div>
+ `<div class="card full mb-3" style="background:linear-gradient(135deg,#065f46,#0f2a3d);border-color:#10b98155"><div class="text-emerald-100/80 text-sm">Total invertido en inventario</div><div class="text-4xl font-bold mt-1 tracking-tight">${m(inv)}</div>
  <div class="grid grid-cols-2 gap-3 mt-4 text-sm"><div><div class="text-emerald-100/70 text-xs">Valor a precio de venta</div><b>${m(val)}</b></div><div><div class="text-emerald-100/70 text-xs">Ganancia potencial</div><b>${m(val-inv)}</b></div></div></div>
- <div class="grid grid-cols-2 md:grid-cols-4 gap-3">${c('Ventas hoy',m(T(vd)),'text-emerald-400')}${c('Ganancia hoy',m(G(vd)),'text-emerald-400')}${c('Ventas del mes',m(T(vm)))}${c('Ganancia del mes',m(G(vm)),'text-emerald-400')}${c('Gastos del mes',m(g),'text-red-400')}${c('Por cobrar',m(sum(db.customers)))}${c('Por pagar',m(sum(db.suppliers)),'text-red-400')}${c('Productos',db.products.length)}</div>
+ <div class="grid grid-cols-2 md:grid-cols-4 gap-3">${c('Ventas hoy',m(T(vd)),'text-emerald-400')}${c('Ganancia hoy',m(G(vd)),'text-emerald-400')}${c('Ventas del mes',m(T(vm)))}${c('Ganancia del mes',m(G(vm)),'text-emerald-400')}${c('Gastos del mes',m(g),'text-red-400')}${c('Por cobrar',m(sum(db.customers)))}${c('Por pagar',m(sum(db.suppliers)),'text-red-400')}${c('Productos',db.products.length)}${c('Pedidos activos',db.orders.filter(oa).length)}${c('Reembolsos por vencer (≤7 días)',db.orders.filter(o=>o.status!=='Reembolsado'&&left(o)>0&&left(o)<=7).length,'text-red-400')}</div>
  <div class="grid grid-cols-2 gap-3 my-4">
  <button class="btn ${qb}" onclick="view='pos';render();scanSell()">${ic('scan')} Nueva venta</button>
  <button class="btnr ${qb}" onclick="txForm('out')">${ic('wallet')} Nuevo gasto</button>
@@ -169,14 +215,14 @@ function vPos(){
  const tot=cart.reduce((s,i)=>s+i.qty*i.price,0),gan=cart.reduce((s,i)=>s+i.qty*(i.price-i.cost),0);
  return head('Punto de venta')+`<button class="btn w-full py-4 mb-3 flex items-center justify-center gap-2" onclick="scanSell()">${ic('scan')} Escanear producto para vender</button>
  <input class="inp mb-3" placeholder="Buscar producto..." value="${esc(q)}" onchange="q=this.value;render()">
- <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">${l.map(p=>`<button class="card !p-2 text-left" onclick="addCart('${p.id}')">${pic(p,'w-full h-24')}<div class="text-sm font-medium mt-2 truncate">${esc(p.name)}</div><div class="flex justify-between text-xs"><b class="text-emerald-400">${m(p.price)}</b><span class="mut">${p.stock} uds</span></div></button>`).join('')||'<p class="mut text-sm col-span-full">Sin resultados.</p>'}</div>
+ <div class="pos"><div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 content-start">${l.map(p=>`<button class="card !p-2 text-left" onclick="addCart('${p.id}')">${pic(p,'w-full h-24')}<div class="text-sm font-medium mt-2 truncate">${esc(p.name)}</div><div class="flex justify-between text-xs"><b class="text-emerald-400">${m(p.price)}</b><span class="mut">${p.stock} uds</span></div></button>`).join('')||'<p class="mut text-sm col-span-full">Sin resultados.</p>'}</div>
  <div class="card"><b>Carrito</b>${cart.map(i=>`<div class="flex items-center gap-3 py-2 border-b border-slate-700/60">${pic(db.products.find(p=>p.id===i.id)||{},'w-11 h-11')}<div class="flex-1 text-sm min-w-0"><b class="block truncate">${esc(i.name)}</b><span class="mut">${m(i.price)} · gana <span class="text-emerald-400">${m(i.price-i.cost)}</span></span></div>
  <div class="flex items-center gap-2"><button class="btn2 !px-3 !py-1" onclick="chg('${i.id}',-1)">−</button><b>${i.qty}</b><button class="btn2 !px-3 !py-1" onclick="chg('${i.id}',1)">+</button></div></div>`).join('')||'<p class="mut text-sm py-3">Carrito vacío.</p>'}
  <div class="flex justify-between text-xl font-semibold mt-3"><span>Total</span><span>${m(tot)}</span></div>
  <div class="flex justify-between text-sm mb-3"><span class="mut">Ganancia de esta venta</span><b class="text-emerald-400">${m(gan)}</b></div>
  <div class="grid grid-cols-2 gap-2"><select class="inp" onchange="pay=this.value">${['Efectivo','Transferencia','Pago Móvil','Tarjeta','Fiado'].map(x=>`<option ${x===pay?'selected':''}>${x}</option>`).join('')}</select>
  <select class="inp" onchange="cust=this.value"><option value="">Cliente (opcional)</option>${db.customers.map(c=>`<option value="${c.id}" ${c.id===cust?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
- <button class="btn w-full mt-3 py-3.5" onclick="checkout()">Cobrar ${m(tot)}</button></div>`;
+ <button class="btn w-full mt-3 py-3.5" onclick="checkout()">Cobrar ${m(tot)}</button></div></div>`;
 }
 function addCart(id){
  const p=db.products.find(x=>x.id===id),i=cart.find(x=>x.id===id),n=(i?i.qty:0)+1;
@@ -209,14 +255,71 @@ function checkout(){
  <button class="btn w-full mt-4" onclick="closeM()">Listo</button>`);
 }
 
+/* ---------- BAJO PEDIDO ---------- */
+const OST=['Por pedir al proveedor','Con el proveedor','En tránsito','En aduana','En mi tienda','Entregado al cliente','Reembolsado'];
+const OBG={'Entregado al cliente':'bg-emerald-500/15 text-emerald-400','Reembolsado':'bg-slate-500/20 text-slate-300','En mi tienda':'bg-sky-500/15 text-sky-300'};
+const oa=o=>!['Entregado al cliente','Reembolsado'].includes(o.status);
+const left=o=>90-Math.floor((Date.now()-new Date(o.d+'T00:00:00'))/864e5);
+let ofil='Activos';
+function vOrd(){
+ const nm=(t,id)=>(ent(t,id)||{}).name||'',act=db.orders.filter(oa);
+ const l=db.orders.filter(o=>(o.name+nm('c',o.cust)+nm('s',o.sid)).toLowerCase().includes(q.toLowerCase())&&(ofil==='Todos'||(ofil==='Activos'?oa(o):o.status===ofil))).slice().reverse();
+ const cd=(a,b,col='')=>`<div class="card"><div class="mut text-xs mb-1">${a}</div><div class="text-xl font-semibold ${col}">${b}</div></div>`;
+ return head('Bajo pedido',`<button class="btn flex items-center gap-1" onclick="ordForm()">${ic('plus',18)} Pedido</button>`)+
+ `<div class="grid grid-cols-3 gap-3">${cd('Activos',act.length)}${cd('Valor en pedidos',m(act.reduce((x,o)=>x+o.value,0)),'text-emerald-400')}${cd('Reembolso ≤7 días',db.orders.filter(o=>o.status!=='Reembolsado'&&left(o)>0&&left(o)<=7).length,'text-red-400')}</div>
+ <div class="flex gap-2 flex-wrap items-center">${[['Activos','Activos'],['Entregado al cliente','Entregados'],['Todos','Todos']].map(([k,t])=>`<button class="px-3 py-1.5 rounded-full text-sm ${ofil===k?'bg-emerald-500 text-[#04261b] font-semibold':'btn2 !py-1.5'}" onclick="ofil='${k}';render()">${t}</button>`).join('')}<input class="inp !w-auto flex-1 min-w-[160px]" placeholder="Buscar producto, cliente o proveedor" value="${esc(q)}" onchange="q=this.value;render()"></div>`+
+ (l.map(o=>{const dl=left(o),pc=Math.max(0,Math.min(100,dl/90*100)),col=dl<=7?'#ef4444':dl<=30?'#f59e0b':'#10b981';
+ return `<div class="card"><div class="flex gap-3">${pic(o,'w-24 h-24 shrink-0')}<div class="flex-1 min-w-0"><div class="flex justify-between gap-2"><b class="truncate">${esc(o.name)}</b><b class="text-emerald-400 shrink-0">${m(o.value)}</b></div>
+ <div class="text-xs mut mt-0.5">Cliente: <span class="text-slate-200">${esc(nm('c',o.cust))||'—'}</span></div><div class="text-xs mut">Proveedor: <span class="text-slate-200">${esc(nm('s',o.sid))||'—'}</span></div>
+ ${o.debt?'<span class="inline-block mt-1 px-2 py-0.5 rounded-md text-[11px] bg-red-500/15 text-red-400">Cliente lo debe</span>':''}</div></div>
+ <div class="mt-3"><div class="mut text-xs mb-1">Dónde está ahora</div><select class="inp !py-1.5 text-sm ${OBG[o.status]||''}" onchange="setSt('${o.id}',this.value)">${so(OST,o.status)}</select>${o.note?`<p class="text-xs mut mt-1">${esc(o.note)}</p>`:''}</div>
+ ${o.status==='Reembolsado'?'':`<div class="mt-3"><div class="flex justify-between text-xs mb-1"><span class="mut">Reembolso · registrado ${o.d}</span><b style="color:${col}">${dl>0?dl+' días restantes':'Plazo vencido'}</b></div><div class="prog"><i style="width:${pc}%;background:${col}"></i></div></div>`}
+ <div class="flex justify-end gap-4 mt-3 text-xs"><button class="text-emerald-400" onclick="ordForm('${o.id}')">Editar</button><button class="text-red-400" onclick="delO('${o.id}')">Eliminar</button></div></div>`}).join('')||empty());
+}
+function ordDebt(o,sg){const c=ent('c',o.cust);if(!c)return;c.balance=Math.max(0,c.balance+sg*o.value);c.hist.push({d:ld(),type:sg>0?'Pedido':'Pedido anulado',note:o.name,amount:o.value})}
+function setSt(id,v){const o=db.orders.find(x=>x.id===id);o.status=v;if(v==='Reembolsado'&&o.debt){ordDebt(o,-1);o.debt=false}save();render();toast('Estado actualizado')}
+function ordForm(id){
+ if(!db.customers.length)return toast('Primero registra un cliente');
+ const o=db.orders.find(x=>x.id===id)||{status:OST[0],debt:true};id=id||'';window._img=o.img||'';
+ const op=(a,v)=>a.map(x=>`<option value="${x.id}" ${x.id===v?'selected':''}>${esc(x.name)}</option>`).join('');
+ modal(`<h3 class="font-semibold text-lg mb-3">${id?'Editar':'Nuevo'} pedido</h3><div class="space-y-2">
+ <label class="flex items-center gap-3 cursor-pointer"><span id="pv">${pic({img:window._img},'w-20 h-20')}</span><span class="btn2 flex items-center gap-2">${ic('camera',18)} Foto del producto</span><input type="file" accept="image/*" class="hidden" onchange="pickImg(this)"></label>
+ <input id="on" class="inp" placeholder="Producto que encargó" value="${esc(o.name)}">
+ <select id="oc" class="inp"><option value="">Cliente</option>${op(db.customers,o.cust)}</select>
+ <select id="os" class="inp"><option value="">Proveedor (opcional)</option>${op(db.suppliers,o.sid)}</select>
+ <input id="ov" type="number" step="0.01" class="inp" placeholder="Valor del producto" value="${o.value??''}">
+ <select id="ost" class="inp">${so(OST,o.status)}</select>
+ <input id="ono" class="inp" placeholder="Detalle de ubicación o tracking (opcional)" value="${esc(o.note)}">
+ <label class="flex items-center gap-2 text-sm"><input id="od" type="checkbox" class="w-5 h-5 accent-emerald-500" ${o.debt?'checked':''}> El cliente lo debe (sumar a su deuda)</label>
+ ${id?'':'<p class="text-xs mut">El plazo de reembolso de 90 días empieza hoy.</p>'}
+ <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveO('${id}')">Guardar</button></div></div>`);
+}
+async function saveO(id){
+ const d={name:$('on').value.trim(),cust:$('oc').value,sid:$('os').value,value:+$('ov').value||0,status:$('ost').value,note:$('ono').value.trim(),debt:$('od').checked,img:window._img||''};
+ if(!d.name)return toast('Escribe el producto');if(!d.cust)return toast('Elige el cliente');
+ if(d.status==='Reembolsado')d.debt=false;
+ const o=id?db.orders.find(x=>x.id===id):null,old=o?{...o}:null;
+ if(d.img.startsWith('data:')){toast('Subiendo foto...');const u=await upImg(d.img);if(u){if(old&&old.img)rmImg(old.img);d.img=u}else d.img=old?old.img:''}
+ const same=old&&old.debt&&d.debt&&old.cust===d.cust&&old.value===d.value;
+ if(old&&old.debt&&!same)ordDebt(old,-1);
+ let n=o;if(o)Object.assign(o,d);else{n={id:uid(),d:ld(),...d};db.orders.push(n)}
+ if(n.debt&&!same)ordDebt(n,1);
+ save();closeM();render();toast('Pedido guardado');
+}
+function delO(id){
+ const o=db.orders.find(x=>x.id===id);
+ if(!confirm('¿Eliminar el pedido?'+(o.debt?' También se quitará su valor de la deuda del cliente.':'')))return;
+ if(o.debt)ordDebt(o,-1);rmImg(o.img);db.orders=db.orders.filter(x=>x.id!==id);save();render();toast('Pedido eliminado');
+}
+
 /* ---------- CLIENTES / PROVEEDORES ---------- */
 function vCus(){
- return head('Clientes',`<button class="btn flex items-center gap-1" onclick="entForm('c')">${ic('plus',18)} Cliente</button>`)+`<div class="card mb-3 flex justify-between"><span class="mut">Total que me deben</span><b class="text-red-400">${m(sum(db.customers))}</b></div>`+
+ return head('Clientes',`<button class="btn flex items-center gap-1" onclick="entForm('c')">${ic('plus',18)} Cliente</button>`)+`<div class="card full mb-3 flex justify-between"><span class="mut">Total que me deben</span><b class="text-red-400">${m(sum(db.customers))}</b></div>`+
  (db.customers.map(c=>`<div class="card mb-3"><div class="flex justify-between"><div><b>${esc(c.name)}</b><div class="mut text-sm">${esc(c.phone)}</div></div><b class="${c.balance>0?'text-red-400':'text-emerald-400'}">${m(c.balance)}</b></div>
  <div class="flex gap-2 mt-3 text-sm flex-wrap"><button class="btn2" onclick="mvForm('c','${c.id}','cred')">Fiar</button><button class="btn" onclick="mvForm('c','${c.id}','abono')">Abono</button><button class="btn2" onclick="hist('c','${c.id}')">Historial</button><button class="btn2" onclick="entForm('c','${c.id}')">Editar</button></div></div>`).join('')||empty());
 }
 function vSup(){
- return head('Proveedores',`<button class="btn flex items-center gap-1" onclick="entForm('s')">${ic('plus',18)} Proveedor</button>`)+`<div class="card mb-3 flex justify-between"><span class="mut">Total que debo</span><b class="text-red-400">${m(sum(db.suppliers))}</b></div>`+
+ return head('Proveedores',`<button class="btn flex items-center gap-1" onclick="entForm('s')">${ic('plus',18)} Proveedor</button>`)+`<div class="card full mb-3 flex justify-between"><span class="mut">Total que debo</span><b class="text-red-400">${m(sum(db.suppliers))}</b></div>`+
  (db.suppliers.map(x=>`<div class="card mb-3"><div class="flex justify-between"><div><b>${esc(x.name)}</b> <span class="mut text-sm">${esc(x.company)}</span><div class="mut text-sm">${esc(x.phone)}</div><div class="text-xs mut">Suministra: ${esc(x.supplies)||'—'}</div></div><b class="${x.balance>0?'text-red-400':'text-emerald-400'}">${m(x.balance)}</b></div>
  <div class="flex gap-2 mt-3 text-sm flex-wrap"><button class="btn" onclick="purchForm('${x.id}')">Registrar compra</button><button class="btn2" onclick="mvForm('s','${x.id}','abono')">Pagar deuda</button><button class="btn2" onclick="hist('s','${x.id}')">Historial</button><button class="btn2" onclick="entForm('s','${x.id}')">Editar</button></div></div>`).join('')||empty());
 }
@@ -364,10 +467,10 @@ async function upImg(du){
 }
 function rmImg(u){const p=(u||'').split('/fotos/')[1];if(p)sb.storage.from('fotos').remove([p])}
 async function setDB(d){
- toast('Subiendo datos…');
+ loader(true,'Subiendo datos');
  for(const p of d.products||[])if(p.img&&p.img.startsWith('data:'))p.img=(await upImg(p.img))||'';
  await qq;await sb.from('records').delete().neq('id','');last.clear();
- db=Object.fromEntries(COLS.map(c=>[c,d[c]||[]]));save();await qq;
+ db=Object.fromEntries(COLS.map(c=>[c,d[c]||[]]));save();await qq;loader(false);
 }
 function localData(){return new Promise(ok=>{
  const r=indexedDB.open('cheetah_wheels');r.onupgradeneeded=()=>r.transaction.abort();r.onerror=()=>ok(null);
