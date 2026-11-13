@@ -81,11 +81,11 @@ body{background:radial-gradient(900px 500px at 88% -10%,#F7501B1f,transparent),r
 /* === CONFIGURACIÓN DE LA NUBE (Supabase): pega aquí tus dos datos === */
 const SUPABASE_URL='https://wwzkhfqfqucfeknvvkzz.supabase.co',SUPABASE_KEY='sb_publishable_5X1CZs8xPno6posImwHRWQ_6felfdEy';
 const LOGO=document.getElementById('lg').src;document.querySelectorAll('[data-logo]').forEach(i=>i.src=LOGO);{const l=document.createElement('link');l.rel='icon';l.href=LOGO;document.head.appendChild(l)}
-const LOW=5,COLS=['products','sales','tx','customers','suppliers','purchases','orders'];let sb,subscribed=false;
-let db={products:[],sales:[],tx:[],customers:[],suppliers:[],purchases:[],orders:[]};
+const LOW=5,COLS=['products','sales','tx','customers','suppliers','purchases','orders','config'];let sb,subscribed=false;
+let db={products:[],sales:[],tx:[],customers:[],suppliers:[],purchases:[],orders:[],config:[]};
 const $=id=>document.getElementById(id);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const m=n=>'$'+(+n||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
+const m=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
 const ld=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sum=a=>a.reduce((s,x)=>s+(+x.balance||0),0);
@@ -123,7 +123,7 @@ async function boot(){
   if(L&&((L.products||[]).length||(L.customers||[]).length||(L.sales||[]).length)&&confirm('Encontré datos guardados en este dispositivo. ¿Subirlos a la nube?'))await setDB(L);
  }
  await new Promise(r=>setTimeout(r,Math.max(0,1400-(Date.now()-t0))));
- $('main').classList.add('anim');render();subscribe();loader(false);
+ $('main').classList.add('anim');render();subscribe();loader(false);refreshRates();
 }
 function go(v){view=v;q='';const e=$('main');e.classList.remove('anim');void e.offsetWidth;e.classList.add('anim');render();scrollTo(0,0)}
 
@@ -142,7 +142,7 @@ function vHome(){
  const low=db.products.filter(p=>p.stock<=LOW);
  const c=(l,v,col='')=>`<div class="card"><div class="mut text-xs mb-1">${l}</div><div class="text-xl font-semibold ${col}">${v}</div></div>`;
  const qb='flex items-center justify-center gap-2 py-3.5';
- return head('Resumen',`<span class="mut text-sm">${d}</span>`)+
+ return head('Resumen',`<span class="mut text-sm">${d}</span>`)+ratesHtml()+
  `<div class="card full mb-3" style="background:linear-gradient(135deg,#F7501B,#b9340e 62%,#0b4a66);border-color:#F7501B66"><div class="text-white/80 text-sm">Total invertido en inventario</div><div class="text-4xl font-bold mt-1 tracking-tight">${m(inv)}</div>
  <div class="grid grid-cols-2 gap-3 mt-4 text-sm"><div><div class="text-white/75 text-xs">Valor a precio de venta</div><b>${m(val)}</b></div><div><div class="text-white/75 text-xs">Ganancia potencial</div><b>${m(val-inv)}</b></div></div></div>
  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">${c('Ventas hoy',m(T(vd)),'text-[#FCEA0D]')}${c('Ganancia hoy',m(G(vd)),'text-[#FCEA0D]')}${c('Ventas del mes',m(T(vm)))}${c('Ganancia del mes',m(G(vm)),'text-[#FCEA0D]')}${c('Gastos del mes',m(g),'text-rose-400')}${c('Por cobrar',m(sum(db.customers)))}${c('Por pagar',m(sum(db.suppliers)),'text-rose-400')}${c('Productos',db.products.length)}${c('Pedidos activos',db.orders.filter(oa).length)}${c('Reembolsos por vencer (≤7 días)',db.orders.filter(o=>o.status!=='Reembolsado'&&left(o)>0&&left(o)<=7).length,'text-rose-400')}</div>
@@ -164,6 +164,7 @@ function vInv(){
  return `<div class="card mb-3"><div class="flex gap-3">${pic(p,'w-20 h-20 shrink-0')}<div class="flex-1 min-w-0"><div class="flex justify-between gap-2"><b class="truncate">${esc(p.name)}</b><span class="shrink-0 h-fit px-2 py-0.5 rounded-lg text-xs font-semibold ${lw?'bg-rose-500/15 text-rose-400':'bg-[#FCEA0D]/10 text-[#FCEA0D]'}">${p.stock} uds</span></div>
  <div class="mut text-xs">${esc(p.sku)||'Sin código'} · ${esc(p.cat)}</div>
  <div class="grid grid-cols-3 gap-2 mt-2 text-xs"><div><div class="mut">Costo</div><b>${m(p.cost)}</b></div><div><div class="mut">Venta</div><b class="text-[#FCEA0D]">${m(p.price)}</b></div><div><div class="mut">Ganancia</div><b class="${u>=0?'text-[#FCEA0D]':'text-rose-400'}">${pc===null?'—':pc.toFixed(1)+'%'}</b></div></div></div></div>
+ <div class="mt-2 text-xs rounded-lg bg-[#1AB1E6]/10 text-[#1AB1E6] px-2 py-1 flex justify-between"><span>${mu(usd(p.price))}</span><span>${mb(bs(p.price))}</span></div>
  <div class="flex justify-between items-center mt-3 text-xs"><span class="mut">Ganancia/ud ${m(u)} · Invertido ${m(p.cost*p.stock)}</span><div class="flex gap-2"><button class="btn2 !py-1.5 !px-3" onclick="prodForm('${p.id}')">Editar</button><button class="btn2 !py-1.5 !px-3 text-rose-400" onclick="delP('${p.id}')">Eliminar</button></div></div></div>`}).join('')||empty());
 }
 function prodForm(id,dr){
@@ -172,12 +173,12 @@ function prodForm(id,dr){
  <label class="flex items-center gap-3 cursor-pointer"><span id="pv">${pic({img:window._img},'w-20 h-20')}</span><span class="btn2 flex items-center gap-2">${ic('camera',18)} Tomar o subir foto</span><input type="file" accept="image/*" class="hidden" onchange="pickImg(this)"></label>
  <input id="pn" class="inp" placeholder="Nombre" value="${esc(p.name)}">
  <div class="flex gap-2"><input id="ps" class="inp" placeholder="Código de barras (SKU)" value="${esc(p.sku)}"><button class="btn flex items-center gap-1 shrink-0" onclick="scanSku('${id}')">${ic('scan',18)} Escanear</button></div>
- <div class="grid grid-cols-2 gap-2"><input id="pc" type="number" step="0.01" class="inp" oninput="gpv()" placeholder="Precio de costo" value="${p.cost??''}"><input id="pp" type="number" step="0.01" class="inp" oninput="gpv()" placeholder="Precio de venta" value="${p.price??''}"></div>
+ <div class="grid grid-cols-2 gap-2"><input id="pc" type="number" step="0.01" class="inp" oninput="gpv()" placeholder="Costo (COP)" value="${p.cost??''}"><input id="pp" type="number" step="0.01" class="inp" oninput="gpv()" placeholder="Precio de venta (COP)" value="${p.price??''}"></div>
  <p id="gp" class="text-sm text-[#FCEA0D] min-h-[1.25rem]"></p>
  <div class="grid grid-cols-2 gap-2"><input id="pk" type="number" class="inp" placeholder="Stock" value="${p.stock??''}"><input id="pt" class="inp" placeholder="Categoría" value="${esc(p.cat)}"></div>
  <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveP('${id}')">Guardar</button></div></div>`);gpv();
 }
-function gpv(){const c=+$('pc').value,p=+$('pp').value;$('gp').textContent=c>0&&p>0?`Ganancia: ${m(p-c)} por unidad (${((p-c)/c*100).toFixed(1)}% sobre el costo)`:''}
+function gpv(){const c=+$('pc').value,p=+$('pp').value;$('gp').textContent=(c>0&&p>0?`Ganancia: ${m(p-c)} por unidad (${((p-c)/c*100).toFixed(1)}%)`:'')+(p>0?` · ${mu(usd(p))} · ${mb(bs(p))}`:'')}
 function pickImg(inp){
  const f=inp.files[0];if(!f)return;const r=new FileReader();
  r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,900/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);window._img=c.toDataURL('image/jpeg',.8);$('pv').innerHTML=pic({img:window._img},'w-20 h-20')};im.src=r.result};
@@ -216,10 +217,11 @@ function vPos(){
  const tot=cart.reduce((s,i)=>s+i.qty*i.price,0),gan=cart.reduce((s,i)=>s+i.qty*(i.price-i.cost),0);
  return head('Punto de venta')+`<button class="btn w-full py-4 mb-3 flex items-center justify-center gap-2" onclick="scanSell()">${ic('scan')} Escanear producto para vender</button>
  <input class="inp mb-3" placeholder="Buscar producto..." value="${esc(q)}" onchange="q=this.value;render()">
- <div class="pos"><div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 content-start">${l.map(p=>`<button class="card !p-2 text-left" onclick="addCart('${p.id}')">${pic(p,'w-full h-24')}<div class="text-sm font-medium mt-2 truncate">${esc(p.name)}</div><div class="flex justify-between text-xs"><b class="text-[#FCEA0D]">${m(p.price)}</b><span class="mut">${p.stock} uds</span></div></button>`).join('')||'<p class="mut text-sm col-span-full">Sin resultados.</p>'}</div>
+ <div class="pos"><div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 content-start">${l.map(p=>`<button class="card !p-2 text-left" onclick="addCart('${p.id}')">${pic(p,'w-full h-24')}<div class="text-sm font-medium mt-2 truncate">${esc(p.name)}</div><div class="flex justify-between text-xs"><b class="text-[#FCEA0D]">${m(p.price)}</b><span class="mut">${p.stock} uds</span></div><div class="text-[11px] text-[#1AB1E6] truncate">${mu(usd(p.price))}</div><div class="text-[11px] text-[#1AB1E6] truncate">${mb(bs(p.price))}</div></button>`).join('')||'<p class="mut text-sm col-span-full">Sin resultados.</p>'}</div>
  <div class="card"><b>Carrito</b>${cart.map(i=>`<div class="flex items-center gap-3 py-2 border-b border-[#26343d]/60">${pic(db.products.find(p=>p.id===i.id)||{},'w-11 h-11')}<div class="flex-1 text-sm min-w-0"><b class="block truncate">${esc(i.name)}</b><span class="mut">${m(i.price)} · gana <span class="text-[#FCEA0D]">${m(i.price-i.cost)}</span></span></div>
  <div class="flex items-center gap-2"><button class="btn2 !px-3 !py-1" onclick="chg('${i.id}',-1)">−</button><b>${i.qty}</b><button class="btn2 !px-3 !py-1" onclick="chg('${i.id}',1)">+</button></div></div>`).join('')||'<p class="mut text-sm py-3">Carrito vacío.</p>'}
  <div class="flex justify-between text-xl font-semibold mt-3"><span>Total</span><span>${m(tot)}</span></div>
+ <div class="flex justify-between text-sm text-[#1AB1E6]"><span>${mu(usd(tot))}</span><span>${mb(bs(tot))}</span></div>
  <div class="flex justify-between text-sm mb-3"><span class="mut">Ganancia de esta venta</span><b class="text-[#FCEA0D]">${m(gan)}</b></div>
  <div class="grid grid-cols-2 gap-2"><select class="inp" onchange="pay=this.value">${['Efectivo','Transferencia','Pago Móvil','Tarjeta','Fiado'].map(x=>`<option ${x===pay?'selected':''}>${x}</option>`).join('')}</select>
  <select class="inp" onchange="cust=this.value"><option value="">Cliente (opcional)</option>${db.customers.map(c=>`<option value="${c.id}" ${c.id===cust?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
@@ -238,6 +240,7 @@ function scanSell(){
   if(!p)return modal(`<h3 class="font-semibold">Producto no encontrado</h3><p class="mut my-2">Código: ${esc(code)}</p><div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cerrar</button><button class="btn flex-1" onclick="prodForm('',{sku:'${esc(code)}'})">Crear producto</button></div>`);
   modal(`<div class="flex gap-3">${pic(p,'w-24 h-24 shrink-0')}<div><h3 class="font-semibold text-lg leading-tight">${esc(p.name)}</h3><p class="mut text-sm">${esc(p.sku)} · ${esc(p.cat)}</p><p class="text-sm mt-1 ${p.stock<=LOW?'text-rose-400':'mut'}">${p.stock} en stock</p></div></div>
   <div class="flex justify-between items-end my-4"><span class="text-3xl font-bold text-[#FCEA0D]">${m(p.price)}</span><span class="text-sm text-[#FCEA0D]">Ganancia ${m(p.price-p.cost)}</span></div>
+  <div class="-mt-2 mb-3 text-sm text-[#1AB1E6]">${mu(usd(p.price))} · ${mb(bs(p.price))}</div>
   <div class="flex gap-2"><button class="btn2 flex-1" onclick="scanSell()">Escanear otro</button><button class="btn flex-1" onclick="addCart('${p.id}');closeM()">Agregar al carrito</button></div>`);
  });
 }
@@ -246,15 +249,63 @@ function checkout(){
  if(pay==='Fiado'&&!cust)return toast('Elige un cliente para fiar');
  const total=cart.reduce((s,i)=>s+i.qty*i.price,0),profit=cart.reduce((s,i)=>s+i.qty*(i.price-i.cost),0),items=cart;
  items.forEach(i=>{db.products.find(x=>x.id===i.id).stock-=i.qty});
- db.sales.push({id:uid(),d:ld(),t:Date.now(),items,total,profit,method:pay,cust});
+ db.sales.push({id:uid(),d:ld(),t:Date.now(),items,total,profit,method:pay,cust,rc:rCop(),rv:rVes()});
  if(pay==='Fiado'){const c=db.customers.find(x=>x.id===cust);c.balance+=total;c.hist.push({d:ld(),type:'Crédito (venta)',amount:total})}
  cart=[];save();render();
  modal(`<div class="text-center mb-3"><div class="w-14 h-14 mx-auto rounded-full bg-[#FCEA0D]/10 text-[#FCEA0D] flex items-center justify-center mb-2">${ic('check',28)}</div><h3 class="font-semibold text-lg">Venta registrada</h3><p class="mut text-sm">${esc(pay)}</p></div>
  ${items.map(i=>`<div class="flex justify-between text-sm py-1.5 border-b border-[#26343d]/60"><span>${i.qty} × ${esc(i.name)}</span><span>${m(i.qty*i.price)} <span class="text-[#FCEA0D] ml-1">+${m(i.qty*(i.price-i.cost))}</span></span></div>`).join('')}
  <div class="flex justify-between text-xl font-semibold mt-3"><span>Total</span><span>${m(total)}</span></div>
+ <div class="flex justify-between text-sm text-[#1AB1E6]"><span>${mu(usd(total))}</span><span>${mb(bs(total))}</span></div>
  <div class="flex justify-between text-lg mt-1"><span class="text-[#FCEA0D]">Ganancia de la venta</span><b class="text-[#FCEA0D]">${m(profit)}</b></div>
  <button class="btn w-full mt-4" onclick="closeM()">Listo</button>`);
 }
+
+/* ---------- TASAS DE CAMBIO ---------- */
+const R=()=>db.config.find(x=>x.id==='tasas')||{id:'tasas',trm:0,usdt:0,adjCop:-50,adjVes:10,ts:0};
+const rCop=()=>R().trm+R().adjCop,rVes=()=>R().usdt+R().adjVes;
+const usd=c=>rCop()>0?c/rCop():null,bs=c=>usd(c)!==null&&rVes()>0?usd(c)*rVes():null;
+const nf=(n,d=2)=>(+n||0).toLocaleString('es-CO',{minimumFractionDigits:d,maximumFractionDigits:d});
+const mu=n=>'US$ '+(n==null?'—':nf(n)),mb=n=>'Bs '+(n==null?'—':nf(n));
+async function jf(u,ms=9000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(u,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
+async function getTrm(){
+ try{const d=new Date().toLocaleDateString('en-CA',{timeZone:'America/Bogota'});
+  const j=await jf('https://www.datos.gov.co/resource/32sa-8pi3.json?$where='+encodeURIComponent("vigenciadesde <= '"+d+"T23:59:59'")+'&$order=vigenciadesde%20DESC&$limit=1');
+  const v=parseFloat(j[0].valor);if(v>1000)return{v,src:'TRM Superfinanciera'}}catch(e){console.warn('TRM',e)}
+ try{const j=await jf('https://open.er-api.com/v6/latest/USD');if(j.rates.COP>1000)return{v:j.rates.COP,src:'referencial'}}catch(e){console.warn('TRM alt',e)}
+ return null;
+}
+async function getUsdt(){
+ for(const u of ['https://criptoya.com/api/binancep2p/USDT/VES/100','https://criptoya.com/api/binancep2p/USDT/VES/1']){
+  try{const j=await jf(u),v=+j.ask||+j.bid;if(v>10)return{v,src:'Binance P2P'}}catch(e){console.warn('USDT',e)}}
+ try{const j=await jf('https://criptoya.com/api/usdt/ves/100'),b=j.binancep2p,v=b&&(+b.ask||+b.bid);if(v>10)return{v,src:'Binance P2P'}}catch(e){console.warn('USDT alt',e)}
+ return null;
+}
+function putRates(n){const i=db.config.findIndex(x=>x.id==='tasas');if(i>=0)db.config[i]=n;else db.config.push(n);save()}
+async function refreshRates(force){
+ const o=R();if(!force&&o.trm&&o.usdt&&Date.now()-o.ts<36e5)return;
+ const [a,b]=await Promise.all([getTrm(),getUsdt()]),n={...o,id:'tasas'};
+ if(a){n.trm=a.v;n.srcC=a.src}if(b){n.usdt=b.v;n.srcV=b.src}
+ if(a&&b)n.ts=Date.now();
+ if(a||b){putRates(n);if(['home','pos','inv'].includes(view))render()}
+ if(force)toast(a&&b?'Tasas actualizadas':'No se pudo actualizar todo. Usa "Ajustar" para ponerlas a mano.');
+}
+setInterval(()=>{if(sb&&$('app').style.display==='block')refreshRates()},6e5);
+function ratesHtml(){
+ const r=R(),ag=r.ts?Math.max(0,Math.round((Date.now()-r.ts)/6e4)):null,sg=x=>(x>=0?'+':'')+x;
+ return `<div class="grid grid-cols-2 gap-3"><div class="card"><div class="mut text-xs">Dólar oficial Colombia (TRM)</div><div class="text-xl font-semibold">${r.trm?'$ '+nf(r.trm):'—'}</div><div class="text-xs mt-1 text-[#1AB1E6]">Usada: $ ${nf(rCop())} (${sg(r.adjCop)})</div></div>
+ <div class="card"><div class="mut text-xs">USDT Binance (Bs)</div><div class="text-xl font-semibold">${r.usdt?'Bs '+nf(r.usdt):'—'}</div><div class="text-xs mt-1 text-[#1AB1E6]">Usada: Bs ${nf(rVes())} (${sg(r.adjVes)})</div></div></div>
+ <div class="flex items-center justify-between text-xs mut"><span>${ag===null?'Sin datos de tasas':'Actualizado hace '+(ag<60?ag+' min':Math.round(ag/60)+' h')} · se renueva cada hora</span><span class="flex gap-3"><button class="text-[#1AB1E6]" onclick="refreshRates(true)">Actualizar</button><button class="text-[#1AB1E6]" onclick="ratesForm()">Ajustar</button></span></div>`;
+}
+function ratesForm(){
+ const r=R();
+ modal(`<h3 class="font-semibold text-lg mb-1">Tasas y ajustes</h3><p class="mut text-xs mb-3">Se actualizan solas cada hora. Aquí puedes corregirlas a mano o cambiar el ajuste.</p><div class="space-y-2">
+ <label class="mut text-xs">Dólar oficial (COP por USD)</label><input id="rt" type="number" step="0.01" class="inp" value="${r.trm||''}">
+ <label class="mut text-xs">Ajuste al dólar en COP (ej. -50)</label><input id="ra" type="number" step="1" class="inp" value="${r.adjCop}">
+ <label class="mut text-xs">USDT en Binance (Bs por USDT)</label><input id="ru" type="number" step="0.01" class="inp" value="${r.usdt||''}">
+ <label class="mut text-xs">Ajuste al USDT en Bs (ej. 10)</label><input id="rb" type="number" step="1" class="inp" value="${r.adjVes}">
+ <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveRates()">Guardar</button></div></div>`);
+}
+function saveRates(){putRates({...R(),id:'tasas',trm:+$('rt').value||0,usdt:+$('ru').value||0,adjCop:+$('ra').value||0,adjVes:+$('rb').value||0,ts:Date.now()});closeM();render();toast('Tasas guardadas')}
 
 /* ---------- BAJO PEDIDO ---------- */
 const OST=['Por pedir al proveedor','Con el proveedor','En tránsito','En aduana','En mi tienda','Entregado al cliente','Reembolsado'];
@@ -288,7 +339,7 @@ function ordForm(id){
  <input id="on" class="inp" placeholder="Producto que encargó" value="${esc(o.name)}">
  <select id="oc" class="inp"><option value="">Cliente</option>${op(db.customers,o.cust)}</select>
  <select id="os" class="inp"><option value="">Proveedor (opcional)</option>${op(db.suppliers,o.sid)}</select>
- <input id="ov" type="number" step="0.01" class="inp" placeholder="Valor del producto" value="${o.value??''}">
+ <input id="ov" type="number" step="0.01" class="inp" placeholder="Valor (COP)" value="${o.value??''}">
  <select id="ost" class="inp">${so(OST,o.status)}</select>
  <input id="ono" class="inp" placeholder="Detalle de ubicación o tracking (opcional)" value="${esc(o.note)}">
  <label class="flex items-center gap-2 text-sm"><input id="od" type="checkbox" class="w-5 h-5 accent-[#F7501B]" ${o.debt?'checked':''}> El cliente lo debe (sumar a su deuda)</label>
