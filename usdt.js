@@ -11,6 +11,7 @@ module.exports = async (req, res) => {
         page: 1, rows: 5, payTypes: [], publisherType: null, countries: []
       })
     });
+    if (!r.ok) throw new Error('Binance respondió ' + r.status);
     const j = await r.json();
     const price = parseFloat(j && j.data && j.data[0] && j.data[0].adv && j.data[0].adv.price);
     if (!(price > 0)) throw new Error('Sin anuncios para ese monto');
