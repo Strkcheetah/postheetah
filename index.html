@@ -261,12 +261,12 @@ function checkout(){
 }
 
 /* ---------- TASAS DE CAMBIO ---------- */
-const R=()=>db.config.find(x=>x.id==='tasas')||{id:'tasas',trm:0,usdt:0,adjCop:-50,adjVes:10,ts:0};
+const R=()=>db.config.find(x=>x.id==='tasas')||{id:'tasas',trm:0,usdt:0,adjCop:-50,adjVes:10,amt:30000,ts:0};
 const rCop=()=>R().trm+R().adjCop,rVes=()=>R().usdt+R().adjVes;
 const usd=c=>rCop()>0?c/rCop():null,bs=c=>usd(c)!==null&&rVes()>0?usd(c)*rVes():null;
 const nf=(n,d=2)=>(+n||0).toLocaleString('es-CO',{minimumFractionDigits:d,maximumFractionDigits:d});
 const mu=n=>'US$ '+(n==null?'—':nf(n)),mb=n=>'Bs '+(n==null?'—':nf(n));
-async function jf(u,ms=9000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(u,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
+async function jf(u,o={},ms=9000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(u,{...o,signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
 async function getTrm(){
  try{const d=new Date().toLocaleDateString('en-CA',{timeZone:'America/Bogota'});
   const j=await jf('https://www.datos.gov.co/resource/32sa-8pi3.json?$where='+encodeURIComponent("vigenciadesde <= '"+d+"T23:59:59'")+'&$order=vigenciadesde%20DESC&$limit=1');
@@ -275,15 +275,17 @@ async function getTrm(){
  return null;
 }
 async function getUsdt(){
- for(const u of ['https://criptoya.com/api/binancep2p/USDT/VES/100','https://criptoya.com/api/binancep2p/USDT/VES/1']){
-  try{const j=await jf(u),v=+j.ask||+j.bid;if(v>10)return{v,src:'Binance P2P'}}catch(e){console.warn('USDT',e)}}
- try{const j=await jf('https://criptoya.com/api/usdt/ves/100'),b=j.binancep2p,v=b&&(+b.ask||+b.bid);if(v>10)return{v,src:'Binance P2P'}}catch(e){console.warn('USDT alt',e)}
+ const amt=R().amt||30000,src='Binance P2P · Comprar · '+nf(amt,0)+' Bs',ok=v=>v>10;
+ const body={fiat:'VES',asset:'USDT',tradeType:'BUY',transAmount:String(amt),page:1,rows:5,payTypes:[],publisherType:null,countries:[]};
+ try{const j=await jf('https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),v=parseFloat(j.data[0].adv.price);if(ok(v))return{v,src}}catch(e){console.warn('USDT directo',e)}
+ try{const j=await jf('/api/usdt?amt='+amt),v=+j.price;if(ok(v))return{v,src}}catch(e){console.warn('USDT /api',e)}
+ try{const ref=R().usdt||1000,j=await jf('https://criptoya.com/api/binancep2p/USDT/VES/'+Math.max(1,Math.round(amt/ref))),v=+j.ask;if(ok(v))return{v,src:'CriptoYa (aproximado)'}}catch(e){console.warn('USDT alt',e)}
  return null;
 }
 function putRates(n){const i=db.config.findIndex(x=>x.id==='tasas');if(i>=0)db.config[i]=n;else db.config.push(n);save()}
 async function refreshRates(force){
- const o=R();if(!force&&o.trm&&o.usdt&&Date.now()-o.ts<36e5)return;
- const [a,b]=await Promise.all([getTrm(),getUsdt()]),n={...o,id:'tasas'};
+ const o=R();if(!force&&o.trm&&o.usdt&&o.v===2&&Date.now()-o.ts<36e5)return;
+ const [a,b]=await Promise.all([getTrm(),getUsdt()]),n={...o,id:'tasas',v:2};
  if(a){n.trm=a.v;n.srcC=a.src}if(b){n.usdt=b.v;n.srcV=b.src}
  if(a&&b)n.ts=Date.now();
  if(a||b){putRates(n);if(['home','pos','inv'].includes(view))render()}
@@ -293,7 +295,7 @@ setInterval(()=>{if(sb&&$('app').style.display==='block')refreshRates()},6e5);
 function ratesHtml(){
  const r=R(),ag=r.ts?Math.max(0,Math.round((Date.now()-r.ts)/6e4)):null,sg=x=>(x>=0?'+':'')+x;
  return `<div class="grid grid-cols-2 gap-3"><div class="card"><div class="mut text-xs">Dólar oficial Colombia (TRM)</div><div class="text-xl font-semibold">${r.trm?'$ '+nf(r.trm):'—'}</div><div class="text-xs mt-1 text-[#1AB1E6]">Usada: $ ${nf(rCop())} (${sg(r.adjCop)})</div></div>
- <div class="card"><div class="mut text-xs">USDT Binance (Bs)</div><div class="text-xl font-semibold">${r.usdt?'Bs '+nf(r.usdt):'—'}</div><div class="text-xs mt-1 text-[#1AB1E6]">Usada: Bs ${nf(rVes())} (${sg(r.adjVes)})</div></div></div>
+ <div class="card"><div class="mut text-xs">USDT Binance · Comprar (${nf(r.amt||30000,0)} Bs)</div><div class="text-xl font-semibold">${r.usdt?'Bs '+nf(r.usdt):'—'}</div><div class="text-xs mt-1 text-[#1AB1E6]">Usada: Bs ${nf(rVes())} (${sg(r.adjVes)})</div></div></div>
  <div class="flex items-center justify-between text-xs mut"><span>${ag===null?'Sin datos de tasas':'Actualizado hace '+(ag<60?ag+' min':Math.round(ag/60)+' h')} · se renueva cada hora</span><span class="flex gap-3"><button class="text-[#1AB1E6]" onclick="refreshRates(true)">Actualizar</button><button class="text-[#1AB1E6]" onclick="ratesForm()">Ajustar</button></span></div>`;
 }
 function ratesForm(){
@@ -302,10 +304,11 @@ function ratesForm(){
  <label class="mut text-xs">Dólar oficial (COP por USD)</label><input id="rt" type="number" step="0.01" class="inp" value="${r.trm||''}">
  <label class="mut text-xs">Ajuste al dólar en COP (ej. -50)</label><input id="ra" type="number" step="1" class="inp" value="${r.adjCop}">
  <label class="mut text-xs">USDT en Binance (Bs por USDT)</label><input id="ru" type="number" step="0.01" class="inp" value="${r.usdt||''}">
+ <label class="mut text-xs">Monto para filtrar en Binance (Bs)</label><input id="rm" type="number" class="inp" value="${r.amt||30000}">
  <label class="mut text-xs">Ajuste al USDT en Bs (ej. 10)</label><input id="rb" type="number" step="1" class="inp" value="${r.adjVes}">
  <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveRates()">Guardar</button></div></div>`);
 }
-function saveRates(){putRates({...R(),id:'tasas',trm:+$('rt').value||0,usdt:+$('ru').value||0,adjCop:+$('ra').value||0,adjVes:+$('rb').value||0,ts:Date.now()});closeM();render();toast('Tasas guardadas')}
+function saveRates(){putRates({...R(),id:'tasas',trm:+$('rt').value||0,usdt:+$('ru').value||0,adjCop:+$('ra').value||0,adjVes:+$('rb').value||0,amt:+$('rm').value||30000,ts:Date.now()});closeM();render();toast('Tasas guardadas')}
 
 /* ---------- BAJO PEDIDO ---------- */
 const OST=['Por pedir al proveedor','Con el proveedor','En tránsito','En aduana','En mi tienda','Entregado al cliente','Reembolsado'];
