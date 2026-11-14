@@ -266,7 +266,7 @@ const rCop=()=>R().trm+R().adjCop,rVes=()=>R().usdt+R().adjVes;
 const usd=c=>rCop()>0?c/rCop():null,bs=c=>usd(c)!==null&&rVes()>0?usd(c)*rVes():null;
 const nf=(n,d=2)=>(+n||0).toLocaleString('es-CO',{minimumFractionDigits:d,maximumFractionDigits:d});
 const mu=n=>'US$ '+(n==null?'—':nf(n)),mb=n=>'Bs '+(n==null?'—':nf(n));
-async function jf(u,o={},ms=9000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(u,{...o,signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
+async function jf(u,o={},ms=9000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(u,{...o,signal:c.signal});if(!r.ok){let m='HTTP '+r.status;try{m+=': '+(await r.json()).error}catch(e){}throw new Error(m)}return await r.json()}finally{clearTimeout(t)}}
 async function getTrm(){
  try{const d=new Date().toLocaleDateString('en-CA',{timeZone:'America/Bogota'});
   const j=await jf('https://www.datos.gov.co/resource/32sa-8pi3.json?$where='+encodeURIComponent("vigenciadesde <= '"+d+"T23:59:59'")+'&$order=vigenciadesde%20DESC&$limit=1');
@@ -275,27 +275,24 @@ async function getTrm(){
  return null;
 }
 async function getUsdt(){
- const amt=R().amt||30000,src='Binance P2P · Comprar · '+nf(amt,0)+' Bs',ok=v=>v>10;
- const body={fiat:'VES',asset:'USDT',tradeType:'BUY',transAmount:String(amt),page:1,rows:5,payTypes:[],publisherType:null,countries:[]};
- try{const j=await jf('https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),v=parseFloat(j.data[0].adv.price);if(ok(v))return{v,src}}catch(e){console.warn('USDT directo',e)}
- try{const j=await jf('/api/usdt?amt='+amt),v=+j.price;if(ok(v))return{v,src}}catch(e){console.warn('USDT /api',e)}
- try{const ref=R().usdt||1000,j=await jf('https://criptoya.com/api/binancep2p/USDT/VES/'+Math.max(1,Math.round(amt/ref))),v=+j.ask;if(ok(v))return{v,src:'CriptoYa (aproximado)'}}catch(e){console.warn('USDT alt',e)}
- return null;
+ const amt=R().amt||30000,src='Binance P2P · Comprar · '+nf(amt,0)+' Bs';
+ try{const j=await jf('/api/usdt?amt='+amt),v=+j.price;return v>10?{v,src}:{err:'Binance no devolvió un precio'}}
+ catch(e){const m=String(e.message||e);console.warn('USDT',e);return{err:m.includes('HTTP 404')?'Falta subir la carpeta api/ a Vercel. Mientras tanto escribe la tasa en Ajustar.':'No se pudo leer Binance ('+m+')'}}
 }
 function putRates(n){const i=db.config.findIndex(x=>x.id==='tasas');if(i>=0)db.config[i]=n;else db.config.push(n);save()}
 async function refreshRates(force){
  const o=R();if(!force&&o.trm&&o.usdt&&o.v===2&&Date.now()-o.ts<36e5)return;
  const [a,b]=await Promise.all([getTrm(),getUsdt()]),n={...o,id:'tasas',v:2};
- if(a){n.trm=a.v;n.srcC=a.src}if(b){n.usdt=b.v;n.srcV=b.src}
- if(a&&b)n.ts=Date.now();
+ if(a){n.trm=a.v;n.srcC=a.src}if(b&&b.v){n.usdt=b.v;n.srcV=b.src;n.errV=''}else if(b)n.errV=b.err
+ if(a&&b&&b.v)n.ts=Date.now();
  if(a||b){putRates(n);if(['home','pos','inv'].includes(view))render()}
- if(force)toast(a&&b?'Tasas actualizadas':'No se pudo actualizar todo. Usa "Ajustar" para ponerlas a mano.');
+ if(force)toast(a&&b&&b.v?'Tasas actualizadas':(b&&b.err)||'No se pudo actualizar todo. Usa "Ajustar".');
 }
 setInterval(()=>{if(sb&&$('app').style.display==='block')refreshRates()},6e5);
 function ratesHtml(){
  const r=R(),ag=r.ts?Math.max(0,Math.round((Date.now()-r.ts)/6e4)):null,sg=x=>(x>=0?'+':'')+x;
  return `<div class="grid grid-cols-2 gap-3"><div class="card"><div class="mut text-xs">Dólar oficial Colombia (TRM)</div><div class="text-xl font-semibold">${r.trm?'$ '+nf(r.trm):'—'}</div><div class="text-xs mt-1 text-[#1AB1E6]">Usada: $ ${nf(rCop())} (${sg(r.adjCop)})</div></div>
- <div class="card"><div class="mut text-xs">USDT Binance · Comprar (${nf(r.amt||30000,0)} Bs)</div><div class="text-xl font-semibold">${r.usdt?'Bs '+nf(r.usdt):'—'}</div><div class="text-xs mt-1 text-[#1AB1E6]">Usada: Bs ${nf(rVes())} (${sg(r.adjVes)})</div></div></div>
+ <div class="card"><div class="mut text-xs">USDT Binance · Comprar (${nf(r.amt||30000,0)} Bs)</div><div class="text-xl font-semibold">${r.usdt?'Bs '+nf(r.usdt):'—'}</div><div class="text-xs mt-1 text-[#1AB1E6]">Usada: Bs ${nf(rVes())} (${sg(r.adjVes)})</div>${r.errV?`<div class="text-[11px] text-rose-400 mt-1">${esc(r.errV)}</div>`:`<div class="text-[11px] mut mt-1">${esc(r.srcV||'')}</div>`}</div></div>
  <div class="flex items-center justify-between text-xs mut"><span>${ag===null?'Sin datos de tasas':'Actualizado hace '+(ag<60?ag+' min':Math.round(ag/60)+' h')} · se renueva cada hora</span><span class="flex gap-3"><button class="text-[#1AB1E6]" onclick="refreshRates(true)">Actualizar</button><button class="text-[#1AB1E6]" onclick="ratesForm()">Ajustar</button></span></div>`;
 }
 function ratesForm(){
