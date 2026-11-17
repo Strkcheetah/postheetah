@@ -330,7 +330,7 @@ function vLotes(){
  return `<h3 class="font-semibold mt-2">Compras por lotes</h3>`+(db.lotes.slice().reverse().map(o=>{
   const s=ent('s',o.sid)||{},it=landed(o),pend=o.status!=='recibido';
   return `<div class="card"><div class="flex justify-between gap-2"><div><b>${esc(o.name||'Lote')}</b><div class="mut text-xs">${esc(s.name||'—')} · ${o.d}</div></div><span class="shrink-0 h-fit px-2 py-0.5 rounded-lg text-xs font-semibold ${pend?'bg-[#FCEA0D]/10 text-[#FCEA0D]':'bg-[#1AB1E6]/15 text-[#1AB1E6]'}">${pend?'Aún no disponible en tienda':'En tienda'}</span></div>
-  <div class="mt-2 text-sm">${it.map(i=>`<div class="flex justify-between gap-2 py-1 border-b border-[#26343d]/60"><span>${i.qty}× ${esc(i.name)}${i.bo?` <span class="text-[11px] px-1.5 rounded bg-[#1AB1E6]/15 text-[#1AB1E6]">Bajo pedido · ${esc((ent('c',i.cust)||{}).name||'')}</span>`:''}</span><span class="text-right">${m(i.lc)}${i.price>0&&i.lc>0?` <span class="mut text-xs">→ ${m(i.price)} (${((i.price-i.lc)/i.lc*100).toFixed(0)}%)</span>`:''}</span></div>`).join('')}</div>
+  <div class="mt-2 text-sm">${it.map(i=>`<div class="flex justify-between gap-2 py-1 border-b border-[#26343d]/60"><span>${i.qty}× ${esc(i.name)}${i.bo?` <span class="text-[11px] px-1.5 rounded bg-[#1AB1E6]/15 text-[#1AB1E6]">Bajo pedido${bqOf(i)<i.qty?' '+bqOf(i)+' de '+i.qty:''} · ${esc((ent('c',i.cust)||{}).name||'')}</span>`:''}</span><span class="text-right">${m(i.lc)}${i.price>0&&i.lc>0?` <span class="mut text-xs">→ ${m(i.price)} (${((i.price-i.lc)/i.lc*100).toFixed(0)}%)</span>`:''}</span></div>`).join('')}</div>
   <div class="flex justify-between gap-2 text-xs mut mt-2"><span>Productos ${m(valOf(o))} · Taxes ${m(o.taxes)} · Envíos ${m(shipTot(o))}</span><b class="text-slate-200 shrink-0">Total ${m(valOf(o)+exTot(o))}</b></div>
   ${pend&&!+((o.ship||{}).int)?'<div class="text-xs text-[#FCEA0D] mt-1">Falta el envío Colombia–Venezuela (último paso)</div>':''}
   <div class="flex justify-end gap-4 mt-3 text-xs">${pend?`<button class="text-[#FCEA0D]" onclick="recvLote('${o.id}')">Marcar recibido en tienda</button>`:''}<button class="text-[#1AB1E6]" onclick="loteForm('','${o.id}')">Editar</button><button class="text-rose-400" onclick="delLote('${o.id}')">Eliminar</button></div></div>`}).join('')||'<p class="mut text-sm py-3">Aún no hay compras por lotes.</p>');
@@ -344,9 +344,10 @@ function drawLF(){const sc=(document.querySelector('#mod .card')||{}).scrollTop|
  <datalist id="dl">${db.products.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist><b class="text-sm">Productos</b>
  <div class="space-y-2 my-2">${LF.items.map((i,k)=>`<div class="rounded-xl border border-[#223039] p-2"><div class="flex gap-2"><input class="inp" list="dl" placeholder="Producto" value="${esc(i.name)}" oninput="LF.items[${k}].name=this.value"><button class="text-rose-400 px-2" onclick="LF.items.splice(${k},1);drawLF()">✕</button></div>
  <div class="grid grid-cols-3 gap-2 mt-2">${lb('Cantidad',`<input type="number" class="inp" value="${i.qty}" oninput="setI(${k},'qty',this.value)">`)}${lb('Costo unitario',`<input type="number" class="inp" value="${i.cost||''}" oninput="setI(${k},'cost',this.value)">`)}${lb('Precio de venta',`<input type="number" class="inp" value="${i.price||''}" oninput="setI(${k},'price',this.value)">`)}</div><div id="lr${k}" class="text-xs text-[#1AB1E6] mt-1"></div>
- <label class="flex items-center gap-2 text-sm mt-2"><input type="checkbox" class="w-5 h-5 accent-[#F7501B]" ${i.bo?'checked':''} onchange="LF.items[${k}].bo=this.checked;drawLF()"> Es bajo pedido (lo encargó un cliente)</label>
+ <label class="flex items-center gap-2 text-sm mt-2"><input type="checkbox" class="w-5 h-5 accent-[#F7501B]" ${i.bo?'checked':''} onchange="LF.items[${k}].bo=this.checked;if(this.checked&&!LF.items[${k}].bq)LF.items[${k}].bq=1;drawLF()"> Es bajo pedido (lo encargó un cliente)</label>
  ${i.bo?`<div class="flex gap-2 mt-2"><select class="inp" onchange="LF.items[${k}].cust=this.value"><option value="">Elige el cliente</option>${db.customers.map(c=>`<option value="${c.id}" ${c.id===i.cust?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="btn2 !px-3" onclick="quickCustL(${k})">+</button></div>
- <label class="flex items-center gap-2 text-sm mt-2"><input type="checkbox" class="w-5 h-5 accent-[#F7501B]" ${i.odebt!==false?'checked':''} onchange="LF.items[${k}].odebt=this.checked"> El cliente lo debe (sumar a su deuda)</label><p class="text-[11px] mut mt-1">Se anota en Bajo pedido con el precio de venta × cantidad.</p>`:''}</div>`).join('')}</div>
+ <label class="block mt-2"><span class="mut text-[11px]">Unidades bajo pedido (del total de ${i.qty})</span><input type="number" min="1" max="${i.qty}" class="inp" value="${bqOf(i)}" oninput="LF.items[${k}].bq=+this.value||0"></label>
+ <label class="flex items-center gap-2 text-sm mt-2"><input type="checkbox" class="w-5 h-5 accent-[#F7501B]" ${i.odebt!==false?'checked':''} onchange="LF.items[${k}].odebt=this.checked"> El cliente lo debe (sumar a su deuda)</label><p class="text-[11px] mut mt-1">Se anota en Bajo pedido con el precio de venta × esas unidades. Las demás unidades van al inventario al recibir el lote.</p>`:''}</div>`).join('')}</div>
  <button class="btn2 w-full" onclick="LF.items.push({id:uid(),name:'',qty:1,cost:0,price:0});drawLF()">+ Agregar producto</button>
  <b class="text-sm block mt-4">Taxes y envíos (se reparten entre los productos)</b>
  <div class="space-y-2 mt-2">${lb('Taxes (impuestos)',`<input type="number" class="inp" value="${LF.taxes||''}" oninput="LF.taxes=+this.value||0;sumLF()">`)}${SH.map(([k,t])=>lb(t,`<input type="number" class="inp" value="${LF.ship[k]||''}" oninput="LF.ship.${k}=+this.value||0;sumLF()">`)).join('')}
@@ -364,20 +365,21 @@ function sumLF(){
 function saveLF(){
  const its=LF.items.filter(i=>String(i.name).trim()&&i.qty>0);if(!its.length)return toast('Agrega al menos un producto');
  const bad=its.find(i=>i.bo&&!i.cust);if(bad)return toast('Elige el cliente de: '+bad.name);
- LF.items=its.map(i=>({...i,name:String(i.name).trim()}));
+ LF.items=its.map(i=>({...i,name:String(i.name).trim(),bq:bqOf(i)}));
  const old=LF.id?db.lotes.find(x=>x.id===LF.id):null,s=ent('s',LF.sid),id=LF.id||uid();LF.id=id;
  LF.debt=Math.max(0,valOf(LF)+(+LF.taxes||0)-(+LF.paid||0));
  if(s){s.balance=Math.max(0,s.balance+LF.debt-(old?old.debt||0:0));s.hist.push({d:ld(),type:old?'Lote editado':'Compra por lote',amount:valOf(LF)+(+LF.taxes||0),note:(LF.name||'')+' · pagado '+m(LF.paid)})}
  db.tx=db.tx.filter(x=>x.ref!==id);
  if(LF.paid>0)db.tx.push({id:uid(),ref:id,d:ld(),type:'out',amount:LF.paid,cat:'Compra de mercancía',method:'Efectivo',note:(s?s.name:'')+' · '+(LF.name||'lote')});
- if(old){Object.assign(old,LF);if(old.status==='recibido')landed(old).forEach(i=>{if(i.bo)return;const p=findP(i.name);if(p)p.cost=Math.round(i.lc)})}else db.lotes.push(LF);
+ if(old){Object.assign(old,LF);if(old.status==='recibido')landed(old).forEach(i=>{if(i.qty-bqOf(i)<=0)return;const p=findP(i.name);if(p)p.cost=Math.round(i.lc)})}else db.lotes.push(LF);
  syncOrders(old||LF);save();closeM();render();toast('Lote guardado');
 }
+const bqOf=i=>i.bo?Math.max(1,Math.min(i.qty,i.bq===undefined?i.qty:(+i.bq||1))):0;
 function syncOrders(L){
  const keep=new Set();
  L.items.forEach(i=>{
   if(!i.bo||!i.cust)return;keep.add(i.id);
-  const d={name:(i.qty>1?i.qty+'× ':'')+i.name,cust:i.cust,sid:L.sid,value:Math.round(i.price*i.qty)||0,debt:i.odebt!==false,lid:L.id,iid:i.id},o=db.orders.find(x=>x.lid===L.id&&x.iid===i.id);
+  const bq=bqOf(i),d={name:(bq>1?bq+'× ':'')+i.name,cust:i.cust,sid:L.sid,value:Math.round(i.price*bq)||0,debt:i.odebt!==false,lid:L.id,iid:i.id},o=db.orders.find(x=>x.lid===L.id&&x.iid===i.id);
   if(o){const same=o.debt&&d.debt&&o.cust===d.cust&&o.value===d.value;if(o.debt&&!same)ordDebt(o,-1);Object.assign(o,d);if(o.debt&&!same)ordDebt(o,1)}
   else{const n={id:uid(),d:ld(),status:L.status==='recibido'?'En mi tienda':'Con el proveedor',note:'Lote: '+(L.name||''),img:'',...d};db.orders.push(n);
    if(n.debt)ordDebt(n,1);else{const c=ent('c',n.cust);if(c)c.hist.push({d:ld(),type:'Pedido (sin deuda)',amount:n.value,note:n.name})}}
@@ -389,13 +391,13 @@ function saveQL(k){const n=$('qn').value.trim();if(!n)return toast('Escribe el n
 
 function recvLote(id){
  const o=db.lotes.find(x=>x.id===id);if(!confirm('¿Marcar como recibido en tienda? Los productos se sumarán al inventario con su costo final.'))return;
- landed(o).forEach(i=>{if(i.bo)return;const p=findP(i.name),c=Math.round(i.lc);
-  if(p){p.stock+=i.qty;p.cost=c;if(i.price>0)p.price=i.price}else db.products.push({id:uid(),name:i.name,sku:'',cost:c,price:i.price||0,stock:i.qty,cat:'',cats:[],img:''})});
+ landed(o).forEach(i=>{const q=i.qty-bqOf(i);if(q<=0)return;const p=findP(i.name),c=Math.round(i.lc);
+  if(p){p.stock+=q;p.cost=c;if(i.price>0)p.price=i.price}else db.products.push({id:uid(),name:i.name,sku:'',cost:c,price:i.price||0,stock:q,cat:'',cats:[],img:''})});
  o.status='recibido';o.rd=ld();db.orders.filter(x=>x.lid===o.id&&!['Reembolsado','Entregado al cliente'].includes(x.status)).forEach(x=>x.status='En mi tienda');save();render();toast('Lote recibido: inventario actualizado');
 }
 function delLote(id){
  const o=db.lotes.find(x=>x.id===id);if(!confirm('¿Eliminar el lote?'+(o.status==='recibido'?' Se restarán sus unidades del inventario.':'')+(db.orders.some(x=>x.lid===id)?' También se eliminarán los pedidos de clientes ligados a este lote.':'')))return;
- if(o.status==='recibido')o.items.forEach(i=>{if(i.bo)return;const p=findP(i.name);if(p)p.stock=Math.max(0,p.stock-i.qty)});
+ if(o.status==='recibido')o.items.forEach(i=>{const q=i.qty-bqOf(i);if(q<=0)return;const p=findP(i.name);if(p)p.stock=Math.max(0,p.stock-q)});
  db.orders.filter(x=>x.lid===id).forEach(x=>{if(x.debt)ordDebt(x,-1)});db.orders=db.orders.filter(x=>x.lid!==id);
  const s=ent('s',o.sid);if(s)s.balance=Math.max(0,s.balance-(o.debt||0));
  db.tx=db.tx.filter(x=>x.ref!==id);db.lotes=db.lotes.filter(x=>x.id!==id);save();render();toast('Lote eliminado');
