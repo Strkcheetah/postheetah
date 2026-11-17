@@ -81,8 +81,8 @@ body{background:radial-gradient(900px 500px at 88% -10%,#F7501B1f,transparent),r
 /* === CONFIGURACIÓN DE LA NUBE (Supabase): pega aquí tus dos datos === */
 const SUPABASE_URL='https://wwzkhfqfqucfeknvvkzz.supabase.co',SUPABASE_KEY='sb_publishable_5X1CZs8xPno6posImwHRWQ_6felfdEy';
 const LOGO=document.getElementById('lg').src;document.querySelectorAll('[data-logo]').forEach(i=>i.src=LOGO);{const l=document.createElement('link');l.rel='icon';l.href=LOGO;document.head.appendChild(l)}
-const LOW=5,COLS=['products','sales','tx','customers','suppliers','purchases','orders','config'];let sb,subscribed=false;
-let db={products:[],sales:[],tx:[],customers:[],suppliers:[],purchases:[],orders:[],config:[]};
+const LOW=0,COLS=['lotes','products','sales','tx','customers','suppliers','purchases','orders','config'];let sb,subscribed=false;
+let db={products:[],sales:[],tx:[],customers:[],suppliers:[],purchases:[],orders:[],config:[],lotes:[]};
 const $=id=>document.getElementById(id);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const m=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
@@ -145,38 +145,39 @@ function vHome(){
  return head('Resumen',`<span class="mut text-sm">${d}</span>`)+ratesHtml()+
  `<div class="card full mb-3" style="background:linear-gradient(135deg,#F7501B,#b9340e 62%,#0b4a66);border-color:#F7501B66"><div class="text-white/80 text-sm">Total invertido en inventario</div><div class="text-4xl font-bold mt-1 tracking-tight">${m(inv)}</div>
  <div class="grid grid-cols-2 gap-3 mt-4 text-sm"><div><div class="text-white/75 text-xs">Valor a precio de venta</div><b>${m(val)}</b></div><div><div class="text-white/75 text-xs">Ganancia potencial</div><b>${m(val-inv)}</b></div></div></div>
- <div class="grid grid-cols-2 md:grid-cols-4 gap-3">${c('Ventas hoy',m(T(vd)),'text-[#FCEA0D]')}${c('Ganancia hoy',m(G(vd)),'text-[#FCEA0D]')}${c('Ventas del mes',m(T(vm)))}${c('Ganancia del mes',m(G(vm)),'text-[#FCEA0D]')}${c('Gastos del mes',m(g),'text-rose-400')}${c('Por cobrar',m(sum(db.customers)))}${c('Por pagar',m(sum(db.suppliers)),'text-rose-400')}${c('Productos',db.products.length)}${c('Pedidos activos',db.orders.filter(oa).length)}${c('Reembolsos por vencer (≤7 días)',db.orders.filter(o=>o.status!=='Reembolsado'&&left(o)>0&&left(o)<=7).length,'text-rose-400')}</div>
+ <div class="grid grid-cols-2 md:grid-cols-4 gap-3">${c('Ventas hoy',m(T(vd)),'text-[#FCEA0D]')}${c('Ganancia hoy',m(G(vd)),'text-[#FCEA0D]')}${c('Ventas del mes',m(T(vm)))}${c('Ganancia del mes',m(G(vm)),'text-[#FCEA0D]')}${c('Gastos del mes',m(g),'text-rose-400')}${c('Por cobrar',m(sum(db.customers)))}${c('Por pagar',m(sum(db.suppliers)),'text-rose-400')}${c('Productos',db.products.length)}${c('Pedidos activos',db.orders.filter(oa).length)}${c('Lotes en camino',db.lotes.filter(o=>o.status!=='recibido').length)}${c('Reembolsos por vencer (≤7 días)',db.orders.filter(o=>o.status!=='Reembolsado'&&left(o)>0&&left(o)<=7).length,'text-rose-400')}</div>
  <div class="grid grid-cols-2 gap-3 my-4">
  <button class="btn ${qb}" onclick="view='pos';render();scanSell()">${ic('scan')} Nueva venta</button>
  <button class="btnr ${qb}" onclick="txForm('out')">${ic('wallet')} Nuevo gasto</button>
  <button class="btn2 ${qb}" onclick="view='inv';render();prodForm()">${ic('plus')} Agregar producto</button>
  <button class="btn2 ${qb}" onclick="view='sup';render();supForm()">${ic('truck')} Registrar proveedor</button></div>
- <div class="card mb-3"><b>Stock bajo (${low.length})</b>${low.map(p=>`<div class="flex items-center gap-3 py-2 border-b border-[#26343d]/60 text-sm">${pic(p,'w-9 h-9')}<span class="flex-1 truncate">${esc(p.name)}</span><span class="text-rose-400 font-medium">${p.stock} uds</span></div>`).join('')||'<p class="mut text-sm mt-1">Todo en orden.</p>'}</div>
+ <div class="card mb-3"><b>Sin unidades (${low.length})</b>${low.map(p=>`<div class="flex items-center gap-3 py-2 border-b border-[#26343d]/60 text-sm">${pic(p,'w-9 h-9')}<span class="flex-1 truncate">${esc(p.name)}</span><span class="text-rose-400 font-medium">${p.stock} uds</span></div>`).join('')||'<p class="mut text-sm mt-1">Todo en orden.</p>'}</div>
  <div class="card"><b>Últimas ventas</b>${db.sales.slice(-5).reverse().map(x=>`<div class="flex justify-between py-2 border-b border-[#26343d]/60 text-sm"><span class="mut">${x.d} · ${x.items.reduce((a,i)=>a+i.qty,0)} uds</span><span><b>${m(x.total)}</b> <span class="text-[#FCEA0D] ml-2">+${m(sp(x))}</span></span></div>`).join('')||'<p class="mut text-sm mt-1">Aún no hay ventas.</p>'}</div>`;
 }
 
 /* ---------- INVENTARIO ---------- */
 function vInv(){
- const l=db.products.filter(p=>(p.name+p.sku+p.cat).toLowerCase().includes(q.toLowerCase()));
+ const l=db.products.filter(p=>(p.name+p.sku+pcats(p).join(' ')).toLowerCase().includes(q.toLowerCase())&&(icat==='Todas'||pcats(p).includes(icat)));
  return head('Inventario',`<button class="btn flex items-center gap-1" onclick="prodForm()">${ic('plus',18)} Producto</button>`)+
- `<div class="flex gap-2 mb-4"><input class="inp" placeholder="Buscar nombre, código o categoría" value="${esc(q)}" onchange="q=this.value;render()"><button class="btn" onclick="scan(c=>{q=c;render()})">${ic('scan')}</button></div>`+
- (l.map(p=>{const u=p.price-p.cost,pc=p.cost>0?u/p.cost*100:null,lw=p.stock<=LOW;
+ `${catChips()}<div class="flex gap-2 mb-4"><input class="inp" placeholder="Buscar nombre, código o categoría" value="${esc(q)}" onchange="q=this.value;render()"><button class="btn" onclick="scan(c=>{q=c;render()})">${ic('scan')}</button></div>`+
+ (l.map(p=>{const u=p.price-p.cost,pc=p.cost>0&&p.price>0?u/p.cost*100:null,lw=p.stock<=LOW;
  return `<div class="card mb-3"><div class="flex gap-3">${pic(p,'w-20 h-20 shrink-0')}<div class="flex-1 min-w-0"><div class="flex justify-between gap-2"><b class="truncate">${esc(p.name)}</b><span class="shrink-0 h-fit px-2 py-0.5 rounded-lg text-xs font-semibold ${lw?'bg-rose-500/15 text-rose-400':'bg-[#FCEA0D]/10 text-[#FCEA0D]'}">${p.stock} uds</span></div>
- <div class="mut text-xs">${esc(p.sku)||'Sin código'} · ${esc(p.cat)}</div>
+ <div class="mut text-xs">${esc(p.sku)||'Sin código'} · ${esc(pcats(p).join(', '))||'Sin categoría'}</div>
  <div class="grid grid-cols-3 gap-2 mt-2 text-xs"><div><div class="mut">Costo</div><b>${m(p.cost)}</b></div><div><div class="mut">Venta</div><b class="text-[#FCEA0D]">${m(p.price)}</b></div><div><div class="mut">Ganancia</div><b class="${u>=0?'text-[#FCEA0D]':'text-rose-400'}">${pc===null?'—':pc.toFixed(1)+'%'}</b></div></div></div></div>
  <div class="mt-2 text-xs rounded-lg bg-[#1AB1E6]/10 text-[#1AB1E6] px-2 py-1 flex justify-between"><span>${mu(usd(p.price))}</span><span>${mb(bs(p.price))}</span></div>
  <div class="flex justify-between items-center mt-3 text-xs"><span class="mut">Ganancia/ud ${m(u)} · Invertido ${m(p.cost*p.stock)}</span><div class="flex gap-2"><button class="btn2 !py-1.5 !px-3" onclick="prodForm('${p.id}')">Editar</button><button class="btn2 !py-1.5 !px-3 text-rose-400" onclick="delP('${p.id}')">Eliminar</button></div></div></div>`}).join('')||empty());
 }
 function prodForm(id,dr){
- const p=dr||db.products.find(x=>x.id===id)||{};id=id||'';window._img=p.img||'';
+ const p=dr||db.products.find(x=>x.id===id)||{};id=id||'';window._img=p.img||'';window._cats=[...pcats(p)];
  modal(`<h3 class="font-semibold text-lg mb-3">${id?'Editar':'Nuevo'} producto</h3><div class="space-y-2">
  <label class="flex items-center gap-3 cursor-pointer"><span id="pv">${pic({img:window._img},'w-20 h-20')}</span><span class="btn2 flex items-center gap-2">${ic('camera',18)} Tomar o subir foto</span><input type="file" accept="image/*" class="hidden" onchange="pickImg(this)"></label>
  <input id="pn" class="inp" placeholder="Nombre" value="${esc(p.name)}">
  <div class="flex gap-2"><input id="ps" class="inp" placeholder="Código de barras (SKU)" value="${esc(p.sku)}"><button class="btn flex items-center gap-1 shrink-0" onclick="scanSku('${id}')">${ic('scan',18)} Escanear</button></div>
  <div class="grid grid-cols-2 gap-2"><input id="pc" type="number" step="0.01" class="inp" oninput="gpv()" placeholder="Costo (COP)" value="${p.cost??''}"><input id="pp" type="number" step="0.01" class="inp" oninput="gpv()" placeholder="Precio de venta (COP)" value="${p.price??''}"></div>
  <p id="gp" class="text-sm text-[#FCEA0D] min-h-[1.25rem]"></p>
- <div class="grid grid-cols-2 gap-2"><input id="pk" type="number" class="inp" placeholder="Stock" value="${p.stock??''}"><input id="pt" class="inp" placeholder="Categoría" value="${esc(p.cat)}"></div>
- <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveP('${id}')">Guardar</button></div></div>`);gpv();
+ <input id="pk" type="number" class="inp" placeholder="Stock" value="${p.stock??''}">
+ <div><div class="mut text-xs mb-1">Categorías (puedes elegir varias)</div><div id="cch" class="flex flex-wrap gap-2 mb-2"></div><div class="flex gap-2"><input id="pt" class="inp" placeholder="Nueva categoría" onkeydown="if(event.key==='Enter'){event.preventDefault();addCat()}"><button type="button" class="btn2" onclick="addCat()">Agregar</button></div></div>
+ <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveP('${id}')">Guardar</button></div></div>`);gpv();drawCats();
 }
 function gpv(){const c=+$('pc').value,p=+$('pp').value;$('gp').textContent=(c>0&&p>0?`Ganancia: ${m(p-c)} por unidad (${((p-c)/c*100).toFixed(1)}%)`:'')+(p>0?` · ${mu(usd(p))} · ${mb(bs(p))}`:'')}
 function pickImg(inp){
@@ -184,7 +185,7 @@ function pickImg(inp){
  r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,900/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);window._img=c.toDataURL('image/jpeg',.8);$('pv').innerHTML=pic({img:window._img},'w-20 h-20')};im.src=r.result};
  r.readAsDataURL(f);
 }
-const readP=()=>({name:$('pn').value.trim(),sku:$('ps').value.trim(),cost:+$('pc').value||0,price:+$('pp').value||0,stock:+$('pk').value||0,cat:$('pt').value.trim()||'General',img:window._img||''});
+const readP=()=>{const t=$('pt').value.trim(),cats=[...window._cats];if(t&&!cats.includes(t))cats.push(t);return{name:$('pn').value.trim(),sku:$('ps').value.trim(),cost:+$('pc').value||0,price:+$('pp').value||0,stock:+$('pk').value||0,cats,cat:cats[0]||'',img:window._img||''}};
 function scanSku(id){const d=readP();scan(c=>{d.sku=c;prodForm(id,d)})}
 async function saveP(id){
  const d=readP();if(!d.name)return toast('Escribe el nombre');
@@ -213,10 +214,10 @@ function manual(){const c=$('mc').value.trim();if(!c)return;const f=window._cb;c
 
 /* ---------- VENDER ---------- */
 function vPos(){
- const l=db.products.filter(p=>(p.name+p.sku).toLowerCase().includes(q.toLowerCase())).slice(0,30);
+ const l=db.products.filter(p=>(p.name+p.sku).toLowerCase().includes(q.toLowerCase())&&(icat==='Todas'||pcats(p).includes(icat))).slice(0,30);
  const tot=cart.reduce((s,i)=>s+i.qty*i.price,0),gan=cart.reduce((s,i)=>s+i.qty*(i.price-i.cost),0);
  return head('Punto de venta')+`<button class="btn w-full py-4 mb-3 flex items-center justify-center gap-2" onclick="scanSell()">${ic('scan')} Escanear producto para vender</button>
- <input class="inp mb-3" placeholder="Buscar producto..." value="${esc(q)}" onchange="q=this.value;render()">
+ ${catChips()}<input class="inp mb-3" placeholder="Buscar producto..." value="${esc(q)}" onchange="q=this.value;render()">
  <div class="pos"><div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 content-start">${l.map(p=>`<button class="card !p-2 text-left" onclick="addCart('${p.id}')">${pic(p,'w-full h-24')}<div class="text-sm font-medium mt-2 truncate">${esc(p.name)}</div><div class="flex justify-between text-xs"><b class="text-[#FCEA0D]">${m(p.price)}</b><span class="mut">${p.stock} uds</span></div><div class="text-[11px] text-[#1AB1E6] truncate">${mu(usd(p.price))}</div><div class="text-[11px] text-[#1AB1E6] truncate">${mb(bs(p.price))}</div></button>`).join('')||'<p class="mut text-sm col-span-full">Sin resultados.</p>'}</div>
  <div class="card"><b>Carrito</b>${cart.map(i=>`<div class="flex items-center gap-3 py-2 border-b border-[#26343d]/60">${pic(db.products.find(p=>p.id===i.id)||{},'w-11 h-11')}<div class="flex-1 text-sm min-w-0"><b class="block truncate">${esc(i.name)}</b><span class="mut">${m(i.price)} · gana <span class="text-[#FCEA0D]">${m(i.price-i.cost)}</span></span></div>
  <div class="flex items-center gap-2"><button class="btn2 !px-3 !py-1" onclick="chg('${i.id}',-1)">−</button><b>${i.qty}</b><button class="btn2 !px-3 !py-1" onclick="chg('${i.id}',1)">+</button></div></div>`).join('')||'<p class="mut text-sm py-3">Carrito vacío.</p>'}
@@ -224,7 +225,7 @@ function vPos(){
  <div class="flex justify-between text-sm text-[#1AB1E6]"><span>${mu(usd(tot))}</span><span>${mb(bs(tot))}</span></div>
  <div class="flex justify-between text-sm mb-3"><span class="mut">Ganancia de esta venta</span><b class="text-[#FCEA0D]">${m(gan)}</b></div>
  <div class="grid grid-cols-2 gap-2"><select class="inp" onchange="pay=this.value">${['Efectivo','Transferencia','Pago Móvil','Tarjeta','Fiado'].map(x=>`<option ${x===pay?'selected':''}>${x}</option>`).join('')}</select>
- <select class="inp" onchange="cust=this.value"><option value="">Cliente (opcional)</option>${db.customers.map(c=>`<option value="${c.id}" ${c.id===cust?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+ <div class="flex gap-2"><select class="inp" onchange="cust=this.value"><option value="">Cliente (opcional)</option>${db.customers.map(c=>`<option value="${c.id}" ${c.id===cust?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="btn2 !px-3" onclick="quickCust()">+</button></div></div>
  <button class="btn w-full mt-3 py-3.5" onclick="checkout()">Cobrar ${m(tot)}</button></div></div>`;
 }
 function addCart(id){
@@ -238,7 +239,7 @@ function scanSell(){
  scan(code=>{
   const p=db.products.find(x=>x.sku===code);
   if(!p)return modal(`<h3 class="font-semibold">Producto no encontrado</h3><p class="mut my-2">Código: ${esc(code)}</p><div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cerrar</button><button class="btn flex-1" onclick="prodForm('',{sku:'${esc(code)}'})">Crear producto</button></div>`);
-  modal(`<div class="flex gap-3">${pic(p,'w-24 h-24 shrink-0')}<div><h3 class="font-semibold text-lg leading-tight">${esc(p.name)}</h3><p class="mut text-sm">${esc(p.sku)} · ${esc(p.cat)}</p><p class="text-sm mt-1 ${p.stock<=LOW?'text-rose-400':'mut'}">${p.stock} en stock</p></div></div>
+  modal(`<div class="flex gap-3">${pic(p,'w-24 h-24 shrink-0')}<div><h3 class="font-semibold text-lg leading-tight">${esc(p.name)}</h3><p class="mut text-sm">${esc(p.sku)} · ${esc(pcats(p).join(', '))}</p><p class="text-sm mt-1 ${p.stock<=LOW?'text-rose-400':'mut'}">${p.stock} en stock</p></div></div>
   <div class="flex justify-between items-end my-4"><span class="text-3xl font-bold text-[#FCEA0D]">${m(p.price)}</span><span class="text-sm text-[#FCEA0D]">Ganancia ${m(p.price-p.cost)}</span></div>
   <div class="-mt-2 mb-3 text-sm text-[#1AB1E6]">${mu(usd(p.price))} · ${mb(bs(p.price))}</div>
   <div class="flex gap-2"><button class="btn2 flex-1" onclick="scanSell()">Escanear otro</button><button class="btn flex-1" onclick="addCart('${p.id}');closeM()">Agregar al carrito</button></div>`);
@@ -250,7 +251,7 @@ function checkout(){
  const total=cart.reduce((s,i)=>s+i.qty*i.price,0),profit=cart.reduce((s,i)=>s+i.qty*(i.price-i.cost),0),items=cart;
  items.forEach(i=>{db.products.find(x=>x.id===i.id).stock-=i.qty});
  db.sales.push({id:uid(),d:ld(),t:Date.now(),items,total,profit,method:pay,cust,rc:rCop(),rv:rVes()});
- if(pay==='Fiado'){const c=db.customers.find(x=>x.id===cust);c.balance+=total;c.hist.push({d:ld(),type:'Crédito (venta)',amount:total})}
+ if(cust){const c=db.customers.find(x=>x.id===cust),nt=items.map(i=>i.qty+'× '+i.name).join(', ');if(c){if(pay==='Fiado'){c.balance+=total;c.hist.push({d:ld(),type:'Compra fiada',amount:total,note:nt})}else c.hist.push({d:ld(),type:'Compra pagada ('+pay+')',amount:total,note:nt})}}
  cart=[];save();render();
  modal(`<div class="text-center mb-3"><div class="w-14 h-14 mx-auto rounded-full bg-[#FCEA0D]/10 text-[#FCEA0D] flex items-center justify-center mb-2">${ic('check',28)}</div><h3 class="font-semibold text-lg">Venta registrada</h3><p class="mut text-sm">${esc(pay)}</p></div>
  ${items.map(i=>`<div class="flex justify-between text-sm py-1.5 border-b border-[#26343d]/60"><span>${i.qty} × ${esc(i.name)}</span><span>${m(i.qty*i.price)} <span class="text-[#FCEA0D] ml-1">+${m(i.qty*(i.price-i.cost))}</span></span></div>`).join('')}
@@ -306,6 +307,80 @@ function ratesForm(){
  <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveRates()">Guardar</button></div></div>`);
 }
 function saveRates(){putRates({...R(),id:'tasas',trm:+$('rt').value||0,usdt:+$('ru').value||0,adjCop:+$('ra').value||0,adjVes:+$('rb').value||0,amt:+$('rm').value||30000,ts:Date.now()});closeM();render();toast('Tasas guardadas')}
+
+/* ---------- CATEGORÍAS ---------- */
+let icat='Todas';
+const pcats=p=>p.cats||(p.cat?[p.cat]:[]),allCats=()=>[...new Set(db.products.flatMap(pcats))].sort();
+function catChips(){return `<div class="flex gap-2 overflow-x-auto pb-1" style="scrollbar-width:none">${['Todas',...allCats()].map((c,i)=>`<button class="px-3 py-1.5 rounded-full text-sm shrink-0 ${icat===c?'bg-[#F7501B] text-white font-semibold':'btn2 !py-1.5'}" onclick="icat=${i?`allCats()[${i-1}]`:`'Todas'`};render()">${esc(c)}</button>`).join('')}</div>`}
+function drawCats(){const all=[...new Set([...allCats(),...window._cats])].sort();window._ac=all;$('cch').innerHTML=all.map((c,i)=>`<button type="button" class="px-3 py-1 rounded-full text-sm ${window._cats.includes(c)?'bg-[#F7501B] text-white':'btn2 !py-1 !px-3'}" onclick="togCat(${i})">${esc(c)}</button>`).join('')||'<span class="mut text-xs">Aún no hay categorías: escribe una y pulsa Agregar</span>'}
+function togCat(i){const c=window._ac[i],k=window._cats.indexOf(c);k>=0?window._cats.splice(k,1):window._cats.push(c);drawCats()}
+function addCat(){const v=$('pt').value.trim();if(v&&!window._cats.includes(v))window._cats.push(v);$('pt').value='';drawCats()}
+
+/* ---------- CLIENTE RÁPIDO (venta) ---------- */
+function quickCust(){modal(`<h3 class="font-semibold text-lg mb-3">Nuevo cliente</h3><div class="space-y-2"><input id="qn" class="inp" placeholder="Nombre"><input id="qp" class="inp" placeholder="Teléfono"><div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveQ()">Guardar y usar</button></div></div>`)}
+function saveQ(){const n=$('qn').value.trim();if(!n)return toast('Escribe el nombre');const c={id:uid(),name:n,phone:$('qp').value.trim(),balance:0,hist:[]};db.customers.push(c);cust=c.id;save();closeM();render();toast('Cliente agregado y seleccionado')}
+
+/* ---------- COMPRAS POR LOTES ---------- */
+const SH=[['usa','Casillero USA'],['nac','Envío nacional Colombia'],['int','Envío internacional Colombia–Venezuela']];
+const valOf=o=>o.items.reduce((a,i)=>a+i.qty*i.cost,0),shipTot=o=>SH.reduce((a,[k])=>a+(+(o.ship||{})[k]||0),0),exTot=o=>(+o.taxes||0)+shipTot(o);
+const findP=n=>db.products.find(p=>p.name.trim().toLowerCase()===String(n).trim().toLowerCase());
+function landed(o){const ex=exTot(o),v=valOf(o),u=o.items.reduce((a,i)=>a+i.qty,0);return o.items.map(i=>({...i,lc:i.cost+(o.mode==='prop'?(v?ex*i.cost/v:0):(u?ex/u:0))}))}
+const vSup=()=>vSup0()+vLotes();
+function vLotes(){
+ return `<h3 class="font-semibold mt-2">Compras por lotes</h3>`+(db.lotes.slice().reverse().map(o=>{
+  const s=ent('s',o.sid)||{},it=landed(o),pend=o.status!=='recibido';
+  return `<div class="card"><div class="flex justify-between gap-2"><div><b>${esc(o.name||'Lote')}</b><div class="mut text-xs">${esc(s.name||'—')} · ${o.d}</div></div><span class="shrink-0 h-fit px-2 py-0.5 rounded-lg text-xs font-semibold ${pend?'bg-[#FCEA0D]/10 text-[#FCEA0D]':'bg-[#1AB1E6]/15 text-[#1AB1E6]'}">${pend?'Aún no disponible en tienda':'En tienda'}</span></div>
+  <div class="mt-2 text-sm">${it.map(i=>`<div class="flex justify-between gap-2 py-1 border-b border-[#26343d]/60"><span>${i.qty}× ${esc(i.name)}</span><span class="text-right">${m(i.lc)}${i.price>0&&i.lc>0?` <span class="mut text-xs">→ ${m(i.price)} (${((i.price-i.lc)/i.lc*100).toFixed(0)}%)</span>`:''}</span></div>`).join('')}</div>
+  <div class="flex justify-between gap-2 text-xs mut mt-2"><span>Productos ${m(valOf(o))} · Taxes ${m(o.taxes)} · Envíos ${m(shipTot(o))}</span><b class="text-slate-200 shrink-0">Total ${m(valOf(o)+exTot(o))}</b></div>
+  ${pend&&!+((o.ship||{}).int)?'<div class="text-xs text-[#FCEA0D] mt-1">Falta el envío Colombia–Venezuela (último paso)</div>':''}
+  <div class="flex justify-end gap-4 mt-3 text-xs">${pend?`<button class="text-[#FCEA0D]" onclick="recvLote('${o.id}')">Marcar recibido en tienda</button>`:''}<button class="text-[#1AB1E6]" onclick="loteForm('','${o.id}')">Editar</button><button class="text-rose-400" onclick="delLote('${o.id}')">Eliminar</button></div></div>`}).join('')||'<p class="mut text-sm py-3">Aún no hay compras por lotes.</p>');
+}
+let LF=null;
+function loteForm(sid,id){const o=id?db.lotes.find(x=>x.id===id):null;LF=o?JSON.parse(JSON.stringify(o)):{id:'',sid,name:'',d:ld(),items:[{name:'',qty:1,cost:0,price:0}],taxes:0,ship:{usa:0,nac:0,int:0},mode:'igual',paid:0,status:'pendiente'};drawLF()}
+function drawLF(){
+ const s=ent('s',LF.sid)||{},lb=(t,h)=>`<label class="block"><span class="mut text-[11px]">${t}</span>${h}</label>`;
+ modal(`<h3 class="font-semibold text-lg">${LF.id?'Editar':'Nuevo'} lote · ${esc(s.name)}</h3>
+ <input class="inp my-2" placeholder="Nombre del pedido (ej. Mattel Creations #1234)" value="${esc(LF.name)}" oninput="LF.name=this.value">
+ <datalist id="dl">${db.products.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist><b class="text-sm">Productos</b>
+ <div class="space-y-2 my-2">${LF.items.map((i,k)=>`<div class="rounded-xl border border-[#223039] p-2"><div class="flex gap-2"><input class="inp" list="dl" placeholder="Producto" value="${esc(i.name)}" oninput="LF.items[${k}].name=this.value"><button class="text-rose-400 px-2" onclick="LF.items.splice(${k},1);drawLF()">✕</button></div>
+ <div class="grid grid-cols-3 gap-2 mt-2">${lb('Cantidad',`<input type="number" class="inp" value="${i.qty}" oninput="setI(${k},'qty',this.value)">`)}${lb('Costo unitario',`<input type="number" class="inp" value="${i.cost||''}" oninput="setI(${k},'cost',this.value)">`)}${lb('Precio de venta',`<input type="number" class="inp" value="${i.price||''}" oninput="setI(${k},'price',this.value)">`)}</div><div id="lr${k}" class="text-xs text-[#1AB1E6] mt-1"></div></div>`).join('')}</div>
+ <button class="btn2 w-full" onclick="LF.items.push({name:'',qty:1,cost:0,price:0});drawLF()">+ Agregar producto</button>
+ <b class="text-sm block mt-4">Taxes y envíos (se reparten entre los productos)</b>
+ <div class="space-y-2 mt-2">${lb('Taxes (impuestos)',`<input type="number" class="inp" value="${LF.taxes||''}" oninput="LF.taxes=+this.value||0;sumLF()">`)}${SH.map(([k,t])=>lb(t,`<input type="number" class="inp" value="${LF.ship[k]||''}" oninput="LF.ship.${k}=+this.value||0;sumLF()">`)).join('')}
+ ${lb('Cómo repartirlos',`<select class="inp" onchange="LF.mode=this.value;sumLF()"><option value="igual" ${LF.mode==='igual'?'selected':''}>Por igual entre todas las unidades</option><option value="prop" ${LF.mode==='prop'?'selected':''}>Proporcional al costo de cada producto</option></select>`)}
+ ${lb('Pagado al proveedor ahora (el resto queda como deuda)',`<input type="number" class="inp" value="${LF.paid||''}" oninput="LF.paid=+this.value||0;sumLF()">`)}</div>
+ <div id="lsum" class="card mt-3 text-sm"></div>
+ <div class="flex gap-2 pt-3"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveLF()">Guardar lote</button></div>`);sumLF();
+}
+function setI(k,f,v){LF.items[k][f]=+v||0;sumLF()}
+function sumLF(){
+ const it=landed(LF),v=valOf(LF),ex=exTot(LF),debt=Math.max(0,v+(+LF.taxes||0)-(+LF.paid||0));
+ it.forEach((i,k)=>{const e=$('lr'+k);if(e)e.textContent='Costo final: '+m(i.lc)+' c/u'+(i.price>0&&i.lc>0?` · ganancia ${((i.price-i.lc)/i.lc*100).toFixed(1)}% (${m(i.price-i.lc)} por unidad)`:'')});
+ $('lsum').innerHTML=`<div class="flex justify-between"><span class="mut">Productos</span><b>${m(v)}</b></div><div class="flex justify-between"><span class="mut">Taxes y envíos a repartir</span><b>${m(ex)}</b></div><div class="flex justify-between text-base mt-1"><span>Total del lote</span><b class="text-[#FCEA0D]">${m(v+ex)}</b></div><div class="flex justify-between"><span class="mut">Deuda con el proveedor</span><b class="text-rose-400">${m(debt)}</b></div>`;
+}
+function saveLF(){
+ const its=LF.items.filter(i=>String(i.name).trim()&&i.qty>0);if(!its.length)return toast('Agrega al menos un producto');
+ LF.items=its.map(i=>({...i,name:String(i.name).trim()}));
+ const old=LF.id?db.lotes.find(x=>x.id===LF.id):null,s=ent('s',LF.sid),id=LF.id||uid();LF.id=id;
+ LF.debt=Math.max(0,valOf(LF)+(+LF.taxes||0)-(+LF.paid||0));
+ if(s){s.balance=Math.max(0,s.balance+LF.debt-(old?old.debt||0:0));s.hist.push({d:ld(),type:old?'Lote editado':'Compra por lote',amount:valOf(LF)+(+LF.taxes||0),note:(LF.name||'')+' · pagado '+m(LF.paid)})}
+ db.tx=db.tx.filter(x=>x.ref!==id);
+ if(LF.paid>0)db.tx.push({id:uid(),ref:id,d:ld(),type:'out',amount:LF.paid,cat:'Compra de mercancía',method:'Efectivo',note:(s?s.name:'')+' · '+(LF.name||'lote')});
+ if(old){Object.assign(old,LF);if(old.status==='recibido')landed(old).forEach(i=>{const p=findP(i.name);if(p)p.cost=Math.round(i.lc)})}else db.lotes.push(LF);
+ save();closeM();render();toast('Lote guardado');
+}
+function recvLote(id){
+ const o=db.lotes.find(x=>x.id===id);if(!confirm('¿Marcar como recibido en tienda? Los productos se sumarán al inventario con su costo final.'))return;
+ landed(o).forEach(i=>{const p=findP(i.name),c=Math.round(i.lc);
+  if(p){p.stock+=i.qty;p.cost=c;if(i.price>0)p.price=i.price}else db.products.push({id:uid(),name:i.name,sku:'',cost:c,price:i.price||0,stock:i.qty,cat:'',cats:[],img:''})});
+ o.status='recibido';o.rd=ld();save();render();toast('Lote recibido: inventario actualizado');
+}
+function delLote(id){
+ const o=db.lotes.find(x=>x.id===id);if(!confirm('¿Eliminar el lote?'+(o.status==='recibido'?' Se restarán sus unidades del inventario.':'')))return;
+ if(o.status==='recibido')o.items.forEach(i=>{const p=findP(i.name);if(p)p.stock=Math.max(0,p.stock-i.qty)});
+ const s=ent('s',o.sid);if(s)s.balance=Math.max(0,s.balance-(o.debt||0));
+ db.tx=db.tx.filter(x=>x.ref!==id);db.lotes=db.lotes.filter(x=>x.id!==id);save();render();toast('Lote eliminado');
+}
 
 /* ---------- BAJO PEDIDO ---------- */
 const OST=['Por pedir al proveedor','Con el proveedor','En tránsito','En aduana','En mi tienda','Entregado al cliente','Reembolsado'];
@@ -370,10 +445,10 @@ function vCus(){
  (db.customers.map(c=>`<div class="card mb-3"><div class="flex justify-between"><div><b>${esc(c.name)}</b><div class="mut text-sm">${esc(c.phone)}</div></div><b class="${c.balance>0?'text-rose-400':'text-[#FCEA0D]'}">${m(c.balance)}</b></div>
  <div class="flex gap-2 mt-3 text-sm flex-wrap"><button class="btn2" onclick="mvForm('c','${c.id}','cred')">Fiar</button><button class="btn" onclick="mvForm('c','${c.id}','abono')">Abono</button><button class="btn2" onclick="hist('c','${c.id}')">Historial</button><button class="btn2" onclick="entForm('c','${c.id}')">Editar</button></div></div>`).join('')||empty());
 }
-function vSup(){
+function vSup0(){
  return head('Proveedores',`<button class="btn flex items-center gap-1" onclick="entForm('s')">${ic('plus',18)} Proveedor</button>`)+`<div class="card full mb-3 flex justify-between"><span class="mut">Total que debo</span><b class="text-rose-400">${m(sum(db.suppliers))}</b></div>`+
  (db.suppliers.map(x=>`<div class="card mb-3"><div class="flex justify-between"><div><b>${esc(x.name)}</b> <span class="mut text-sm">${esc(x.company)}</span><div class="mut text-sm">${esc(x.phone)}</div><div class="text-xs mut">Suministra: ${esc(x.supplies)||'—'}</div></div><b class="${x.balance>0?'text-rose-400':'text-[#FCEA0D]'}">${m(x.balance)}</b></div>
- <div class="flex gap-2 mt-3 text-sm flex-wrap"><button class="btn" onclick="purchForm('${x.id}')">Registrar compra</button><button class="btn2" onclick="mvForm('s','${x.id}','abono')">Pagar deuda</button><button class="btn2" onclick="hist('s','${x.id}')">Historial</button><button class="btn2" onclick="entForm('s','${x.id}')">Editar</button></div></div>`).join('')||empty());
+ <div class="flex gap-2 mt-3 text-sm flex-wrap"><button class="btn" onclick="loteForm('${x.id}')">Registrar compra (lote)</button><button class="btn2" onclick="mvForm('s','${x.id}','abono')">Pagar deuda</button><button class="btn2" onclick="hist('s','${x.id}')">Historial</button><button class="btn2" onclick="entForm('s','${x.id}')">Editar</button></div></div>`).join('')||empty());
 }
 const cusForm=()=>entForm('c'),supForm=()=>entForm('s');
 function entForm(t,id){
@@ -393,7 +468,7 @@ function saveE(t,id){
 }
 function delE(t,id){
  if(!confirm('¿Eliminar? También se borrará su historial.'))return;
- const k=t==='c'?'customers':'suppliers';db[k]=db[k].filter(x=>x.id!==id);if(t==='s')db.purchases=db.purchases.filter(p=>p.sid!==id);
+ const k=t==='c'?'customers':'suppliers';db[k]=db[k].filter(x=>x.id!==id);if(t==='s'){db.purchases=db.purchases.filter(p=>p.sid!==id);db.lotes=db.lotes.filter(p=>p.sid!==id)}
  save();closeM();render();toast('Eliminado');
 }
 const ent=(t,id)=>(t==='c'?db.customers:db.suppliers).find(x=>x.id===id);
