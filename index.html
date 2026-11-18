@@ -376,10 +376,10 @@ function saveLF(){
 }
 const bqOf=i=>i.bo?Math.max(1,Math.min(i.qty,i.bq===undefined?i.qty:(+i.bq||1))):0;
 function syncOrders(L){
- const keep=new Set();
+ const keep=new Set(),LC=landed(L);
  L.items.forEach(i=>{
   if(!i.bo||!i.cust)return;keep.add(i.id);
-  const bq=bqOf(i),d={name:(bq>1?bq+'× ':'')+i.name,cust:i.cust,sid:L.sid,value:Math.round(i.price*bq)||0,debt:i.odebt!==false,lid:L.id,iid:i.id},o=db.orders.find(x=>x.lid===L.id&&x.iid===i.id);
+  const bq=bqOf(i),d={name:(bq>1?bq+'× ':'')+i.name,cust:i.cust,sid:L.sid,value:Math.round(i.price*bq)||0,cost:Math.round(((LC.find(x=>x.id===i.id)||i).lc||i.cost)*bq),debt:i.odebt!==false,lid:L.id,iid:i.id},o=db.orders.find(x=>x.lid===L.id&&x.iid===i.id);
   if(o){const same=o.debt&&d.debt&&o.cust===d.cust&&o.value===d.value;if(o.debt&&!same)ordDebt(o,-1);Object.assign(o,d);if(o.debt&&!same)ordDebt(o,1)}
   else{const n={id:uid(),d:ld(),status:L.status==='recibido'?'En mi tienda':'Con el proveedor',note:'Lote: '+(L.name||''),img:'',...d};db.orders.push(n);
    if(n.debt)ordDebt(n,1);else{const c=ent('c',n.cust);if(c)c.hist.push({d:ld(),type:'Pedido (sin deuda)',amount:n.value,note:n.name})}}
@@ -419,38 +419,76 @@ function vOrd(){
  (l.map(o=>{const dl=left(o),pc=Math.max(0,Math.min(100,dl/90*100)),col=dl<=7?'#fb7185':dl<=30?'#FCEA0D':'#1AB1E6';
  return `<div class="card"><div class="flex gap-3">${pic(o,'w-24 h-24 shrink-0')}<div class="flex-1 min-w-0"><div class="flex justify-between gap-2"><b class="truncate">${esc(o.name)}</b><b class="text-[#FCEA0D] shrink-0">${m(o.value)}</b></div>
  <div class="text-xs mut mt-0.5">Cliente: <span class="text-slate-200">${esc(nm('c',o.cust))||'—'}</span></div><div class="text-xs mut">Proveedor: <span class="text-slate-200">${esc(nm('s',o.sid))||'—'}</span></div>
+ ${o.cost>0&&o.value>0?`<div class="text-xs mut">Costo ${m(o.cost)} · Ganancia <span class="text-[#FCEA0D]">${m(o.value-o.cost)} (${((o.value-o.cost)/o.cost*100).toFixed(0)}%)</span></div>`:''}
  ${o.debt?'<span class="inline-block mt-1 px-2 py-0.5 rounded-md text-[11px] bg-rose-500/15 text-rose-400">Cliente lo debe</span>':''}</div></div>
+ ${o.value>0?`<div class="mt-3"><div class="flex justify-between text-xs mb-1"><span class="mut">Anticipos ${m(opaid(o))} · Falta <b class="text-rose-400">${m(odue(o))}</b></span><span class="flex gap-3"><button class="text-[#1AB1E6]" onclick="advForm('${o.id}')">+ Anticipo</button>${opaid(o)>0?`<button class="text-[#1AB1E6]" onclick="advList('${o.id}')">Ver</button>`:''}</span></div><div class="prog"><i style="width:${Math.min(100,opaid(o)/o.value*100)}%;background:#1AB1E6"></i></div></div>`:''}
  <div class="mt-3"><div class="mut text-xs mb-1">Dónde está ahora</div><select class="inp !py-1.5 text-sm ${OBG[o.status]||''}" onchange="setSt('${o.id}',this.value)">${so(OST,o.status)}</select>${o.note?`<p class="text-xs mut mt-1">${esc(o.note)}</p>`:''}</div>
  ${o.status==='Reembolsado'?'':`<div class="mt-3"><div class="flex justify-between text-xs mb-1"><span class="mut">Reembolso · registrado ${o.d}</span><b style="color:${col}">${dl>0?dl+' días restantes':'Plazo vencido'}</b></div><div class="prog"><i style="width:${pc}%;background:${col}"></i></div></div>`}
  <div class="flex justify-end gap-4 mt-3 text-xs"><button class="text-[#1AB1E6]" onclick="ordForm('${o.id}')">Editar</button><button class="text-rose-400" onclick="delO('${o.id}')">Eliminar</button></div></div>`}).join('')||empty());
 }
-function ordDebt(o,sg){const c=ent('c',o.cust);if(!c)return;c.balance=Math.max(0,c.balance+sg*o.value);c.hist.push({d:ld(),type:sg>0?'Pedido':'Pedido anulado',note:o.name,amount:o.value})}
+function ordDebt(o,sg){const c=ent('c',o.cust);if(!c)return;c.balance=Math.max(0,c.balance+sg*odue(o));c.hist.push({d:ld(),type:sg>0?'Pedido':'Pedido anulado',note:o.name,amount:odue(o)})}
+const opaid=o=>(o.pays||[]).reduce((a,p)=>a+p.amount,0),odue=o=>Math.max(0,o.value-opaid(o));
+const readO=()=>({name:$('on').value.trim(),cust:$('oc').value,sid:$('os').value,cost:+$('oco').value||0,value:+$('ov').value||0,status:$('ost').value,note:$('ono').value.trim(),debt:$('od').checked,img:window._img||'',adv:+(($('oa')||{}).value)||0});
+function gpo(){const c=+$('oco').value,v=+$('ov').value;$('gpo').textContent=v>0?(c>0?`Ganancia: ${m(v-c)} (${((v-c)/c*100).toFixed(1)}%) · `:'')+`${mu(usd(v))} · ${mb(bs(v))}`:''}
+function quickE(t){
+ window._od=readO();const sp_=t==='s';
+ modal(`<h3 class="font-semibold text-lg mb-3">Nuevo ${sp_?'proveedor':'cliente'}</h3><div class="space-y-2"><input id="qn" class="inp" placeholder="Nombre"><input id="qp" class="inp" placeholder="Teléfono">${sp_?'<input id="qc" class="inp" placeholder="Empresa"><input id="qs" class="inp" placeholder="Productos que suministra">':''}
+ <div class="flex gap-2"><button class="btn2 flex-1" onclick="ordForm(window._oid,window._od)">Cancelar</button><button class="btn flex-1" onclick="saveQE('${t}')">Guardar y usar</button></div></div>`);
+}
+function saveQE(t){
+ const n=$('qn').value.trim();if(!n)return toast('Escribe el nombre');
+ const e={id:uid(),name:n,phone:$('qp').value.trim(),balance:0,hist:[]};
+ if(t==='s'){e.company=$('qc').value.trim();e.supplies=$('qs').value.trim();db.suppliers.push(e);window._od.sid=e.id}else{db.customers.push(e);window._od.cust=e.id}
+ save();ordForm(window._oid,window._od);toast('Agregado y seleccionado');
+}
+function advForm(id){
+ const o=db.orders.find(x=>x.id===id);
+ modal(`<h3 class="font-semibold text-lg">Anticipo · ${esc(o.name)}</h3><p class="mut text-xs mb-3">Falta por pagar ${m(odue(o))}</p><div class="space-y-2"><input id="aa" type="number" class="inp" placeholder="Monto (COP)"><select id="am" class="inp">${opts(METHODS)}</select>
+ <div class="flex gap-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveAdv('${id}')">Registrar</button></div></div>`);
+}
+function saveAdv(id){
+ const o=db.orders.find(x=>x.id===id);let a=+$('aa').value;if(!(a>0))return toast('Monto inválido');
+ if(o.value>0)a=Math.min(a,odue(o));if(a<=0)return toast('Este pedido ya está pagado');
+ const pid=uid(),mt=$('am').value,c=ent('c',o.cust);(o.pays=o.pays||[]).push({id:pid,d:ld(),amount:a,method:mt});
+ if(c){if(o.debt)c.balance=Math.max(0,c.balance-a);c.hist.push({d:ld(),type:'Anticipo pedido',note:o.name,amount:a})}
+ db.tx.push({id:uid(),ref:pid,d:ld(),type:'in',amount:a,cat:'Anticipo bajo pedido',method:mt,note:(c?c.name:'')+' · '+o.name});
+ save();closeM();render();toast('Anticipo registrado');
+}
+function advList(id){
+ const o=db.orders.find(x=>x.id===id);
+ modal(`<h3 class="font-semibold text-lg mb-2">Anticipos · ${esc(o.name)}</h3>${(o.pays||[]).map(p=>`<div class="flex justify-between items-center py-2 border-b border-[#26343d]/60 text-sm"><span>${p.d} · ${esc(p.method)}</span><span><b>${m(p.amount)}</b> <button class="text-rose-400 ml-2 text-xs" onclick="delAdv('${id}','${p.id}')">Eliminar</button></span></div>`).join('')||empty()}<button class="btn2 w-full mt-3" onclick="closeM()">Cerrar</button>`);
+}
+function delAdv(id,pid){
+ const o=db.orders.find(x=>x.id===id),p=o.pays.find(x=>x.id===pid);if(!confirm('¿Eliminar este anticipo? También se quita de Caja.'))return;
+ o.pays=o.pays.filter(x=>x.id!==pid);const c=ent('c',o.cust);if(o.debt&&c)c.balance+=p.amount;
+ db.tx=db.tx.filter(x=>x.ref!==pid);save();closeM();render();toast('Anticipo eliminado');
+}
 function setSt(id,v){const o=db.orders.find(x=>x.id===id);o.status=v;if(v==='Reembolsado'&&o.debt){ordDebt(o,-1);o.debt=false}save();render();toast('Estado actualizado')}
-function ordForm(id){
- if(!db.customers.length)return toast('Primero registra un cliente');
- const o=db.orders.find(x=>x.id===id)||{status:OST[0],debt:true};id=id||'';window._img=o.img||'';
+function ordForm(id,dr){
+ const o=dr||db.orders.find(x=>x.id===id)||{status:OST[0],debt:true};id=id||'';window._oid=id;window._img=o.img||'';
  const op=(a,v)=>a.map(x=>`<option value="${x.id}" ${x.id===v?'selected':''}>${esc(x.name)}</option>`).join('');
  modal(`<h3 class="font-semibold text-lg mb-3">${id?'Editar':'Nuevo'} pedido</h3><div class="space-y-2">
  <label class="flex items-center gap-3 cursor-pointer"><span id="pv">${pic({img:window._img},'w-20 h-20')}</span><span class="btn2 flex items-center gap-2">${ic('camera',18)} Foto del producto</span><input type="file" accept="image/*" class="hidden" onchange="pickImg(this)"></label>
  <input id="on" class="inp" placeholder="Producto que encargó" value="${esc(o.name)}">
- <select id="oc" class="inp"><option value="">Cliente</option>${op(db.customers,o.cust)}</select>
- <select id="os" class="inp"><option value="">Proveedor (opcional)</option>${op(db.suppliers,o.sid)}</select>
- <input id="ov" type="number" step="0.01" class="inp" placeholder="Valor (COP)" value="${o.value??''}">
+ <div class="flex gap-2"><select id="oc" class="inp"><option value="">Cliente</option>${op(db.customers,o.cust)}</select><button type="button" class="btn2 !px-3" onclick="quickE('c')">+</button></div>
+ <div class="flex gap-2"><select id="os" class="inp"><option value="">Proveedor (opcional)</option>${op(db.suppliers,o.sid)}</select><button type="button" class="btn2 !px-3" onclick="quickE('s')">+</button></div>
+ <div class="grid grid-cols-2 gap-2"><label class="block"><span class="mut text-[11px]">Costo para mí (COP)</span><input id="oco" type="number" class="inp" value="${o.cost||''}" oninput="gpo()"></label><label class="block"><span class="mut text-[11px]">Precio de venta (COP)</span><input id="ov" type="number" class="inp" value="${o.value||''}" oninput="gpo()"></label></div><p id="gpo" class="text-sm text-[#FCEA0D] min-h-[1.25rem]"></p>
+ ${id?'':`<div class="grid grid-cols-2 gap-2"><label class="block"><span class="mut text-[11px]">Anticipo recibido ahora (opcional)</span><input id="oa" type="number" class="inp" value="${o.adv||''}"></label><label class="block"><span class="mut text-[11px]">Método del anticipo</span><select id="oam" class="inp">${opts(METHODS)}</select></label></div>`}
  <select id="ost" class="inp">${so(OST,o.status)}</select>
  <input id="ono" class="inp" placeholder="Detalle de ubicación o tracking (opcional)" value="${esc(o.note)}">
  <label class="flex items-center gap-2 text-sm"><input id="od" type="checkbox" class="w-5 h-5 accent-[#F7501B]" ${o.debt?'checked':''}> El cliente lo debe (sumar a su deuda)</label>
  ${id?'':'<p class="text-xs mut">El plazo de reembolso de 90 días empieza hoy.</p>'}
- <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveO('${id}')">Guardar</button></div></div>`);
+ <div class="flex gap-2 pt-2"><button class="btn2 flex-1" onclick="closeM()">Cancelar</button><button class="btn flex-1" onclick="saveO('${id}')">Guardar</button></div></div>`);gpo();
 }
 async function saveO(id){
- const d={name:$('on').value.trim(),cust:$('oc').value,sid:$('os').value,value:+$('ov').value||0,status:$('ost').value,note:$('ono').value.trim(),debt:$('od').checked,img:window._img||''};
+ const d=readO();delete d.adv;
  if(!d.name)return toast('Escribe el producto');if(!d.cust)return toast('Elige el cliente');
  if(d.status==='Reembolsado')d.debt=false;
  const o=id?db.orders.find(x=>x.id===id):null,old=o?{...o}:null;
  if(d.img.startsWith('data:')){toast('Subiendo foto...');const u=await upImg(d.img);if(u){if(old&&old.img)rmImg(old.img);d.img=u}else d.img=old?old.img:''}
  const same=old&&old.debt&&d.debt&&old.cust===d.cust&&old.value===d.value;
  if(old&&old.debt&&!same)ordDebt(old,-1);
- let n=o;if(o)Object.assign(o,d);else{n={id:uid(),d:ld(),...d};db.orders.push(n)}
+ let n=o;if(o)Object.assign(o,d);else{n={id:uid(),d:ld(),...d,pays:[]};const a=Math.min(+(($('oa')||{}).value)||0,d.value||1e12);if(a>0){const pid=uid(),mt=$('oam').value,cc=ent('c',d.cust);n.pays=[{id:pid,d:ld(),amount:a,method:mt}];db.tx.push({id:uid(),ref:pid,d:ld(),type:'in',amount:a,cat:'Anticipo bajo pedido',method:mt,note:(cc?cc.name:'')+' · '+d.name});if(cc)cc.hist.push({d:ld(),type:'Anticipo pedido',note:d.name,amount:a})}db.orders.push(n)}
  if(n.debt&&!same)ordDebt(n,1);
  save();closeM();render();toast('Pedido guardado');
 }
